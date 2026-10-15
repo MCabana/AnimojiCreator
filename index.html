@@ -183,13 +183,13 @@
 
     <!-- Custom Character / 3D Model Modal -->
     <div id="modal-custom" class="fixed inset-0 bg-slate-900/80 z-[100] hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl w-full max-w-sm flex flex-col overflow-hidden shadow-2xl transform transition-all max-h-[95dvh]">
+        <div class="bg-white rounded-3xl w-full max-w-sm h-[95dvh] max-h-[95dvh] min-h-0 flex flex-col overflow-hidden shadow-2xl transform transition-all">
             <div class="bg-indigo-50 p-3 border-b border-indigo-100 text-center shrink-0 flex items-center justify-between px-4">
                 <h2 class="text-base font-bold text-indigo-900">Custom Studio</h2>
                 <button id="btn-load-test-3d" class="text-xs font-bold bg-indigo-500 text-white px-3 py-1 rounded-full shadow-sm hover:bg-indigo-600 transition active:scale-95">Load Test 3D Avatar</button>
             </div>
             
-            <div class="p-4 flex flex-col gap-4 overflow-y-auto">
+            <div class="p-4 flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
                 <div class="relative w-full aspect-square bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZjFmNWY5Ii8+PHJlY3QgeD0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2UydThmMCIvPjxyZWN0IHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNlMmV4ZjAiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjVmOSIvyz48L3N2Zz4=')] rounded-2xl overflow-hidden border border-slate-200 shadow-inner shrink-0" id="custom-preview-container">
                     <canvas id="custom-preview-canvas" class="w-full h-full absolute inset-0 cursor-move touch-none"></canvas>
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -210,6 +210,7 @@
                     </div>
                 </div>
 
+                <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-4 pr-1">
                 <div class="shrink-0 flex gap-3">
                     <label class="flex-1 relative cursor-pointer group">
                         <input type="file" id="custom-image-file" accept="image/*" class="hidden">
@@ -317,6 +318,7 @@
                 <div class="flex gap-3 shrink-0 pt-2 border-t border-slate-100">
                     <button id="btn-custom-cancel" class="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-500 active:scale-95 transition">Cancel</button>
                     <button id="btn-custom-save" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold text-white active:scale-95 transition opacity-50 pointer-events-none">Save & Use</button>
+                </div>
                 </div>
             </div>
         </div>
