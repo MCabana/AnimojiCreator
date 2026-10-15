@@ -417,8 +417,6 @@
 
             const mesh = new THREE.Mesh(geo, mat);
 
-            // Counter-rotate the plane so it faces the camera perfectly, 
-            // regardless of how mangled the imported bone's rotation is.
             const anchor = new THREE.Group();
             bone.updateWorldMatrix(true, false);
             const worldQuat = new THREE.Quaternion();
@@ -453,13 +451,18 @@
             
             const featureW = (maxX - minX) * vw;
             const featureH = (maxY - minY) * vh;
-            const scale = Math.min(canvas.width / featureW, canvas.height / featureH) * 0.75;
+            
+            // Reduce scale slightly to 0.55 to leave padding on the canvas for the feathered mask
+            const scale = Math.min(canvas.width / featureW, canvas.height / featureH) * 0.55; 
             
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
             if (rollAngle !== 0) ctx.rotate(-rollAngle);
             if (flipFor3D) ctx.scale(-1, 1);
             
+            // 1. Draw the face boundary, expanded and heavily blurred to feather the edges
+            ctx.save();
+            ctx.scale(1.4, 1.4); // Expand the masked area by 40% to show more surrounding skin
             ctx.beginPath();
             indices.forEach((idx, i) => {
                 const pt = landmarks[idx];
@@ -469,21 +472,18 @@
             });
             ctx.closePath();
             
-            ctx.save();
-            ctx.clip();
-            ctx.scale(-1, 1);
+            ctx.fillStyle = '#ffffff';
+            ctx.filter = 'blur(12px)'; // Apply heavy feathering to the mask edges
+            ctx.fill();
+            ctx.fill(); // Fill twice to keep the center solidly opaque
+            ctx.restore();
+            
+            // 2. Composite the video frame on top so it seamlessly blends into transparency
+            ctx.globalCompositeOperation = 'source-in';
+            ctx.scale(-1, 1); // Flip horizontally because the video input is mirrored
             const drawW = vw * scale;
             const drawH = vh * scale;
             ctx.drawImage(video, -anchorX * drawW, -anchorY * drawH, drawW, drawH);
-            ctx.restore();
-            
-            ctx.lineWidth = 15;
-            ctx.strokeStyle = '#ffffff';
-            ctx.shadowColor = '#ffffff';
-            ctx.shadowBlur = 10;
-            ctx.stroke();
-            ctx.lineWidth = 8;
-            ctx.stroke();
             
             ctx.restore();
         }
