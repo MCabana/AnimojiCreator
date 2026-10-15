@@ -306,6 +306,11 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
+                            <p class="text-[10px] font-bold text-slate-400">FEATURE PLANE CURVATURE</p>
+                            <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-500 w-20">HORIZONTAL</span><input type="range" id="c3d-curve-horizontal" min="-6" max="6" step="0.1" value="1.5" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-indigo-400"></div>
+                            <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-500 w-20">VERTICAL</span><input type="range" id="c3d-curve-vertical" min="-6" max="6" step="0.1" value="1.5" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-indigo-400"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -423,14 +428,7 @@
             const tex = new THREE.CanvasTexture(cvs);
             const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
             
-            const geo = new THREE.PlaneGeometry(0.5, 0.5, 16, 1); 
-            const pos = geo.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-                const x = pos.getX(i);
-                const z = -1.5 * (x * x); 
-                pos.setZ(i, z);
-            }
-            geo.computeVertexNormals();
+            const geo = new THREE.PlaneGeometry(0.5, 0.5, 16, 16);
 
             const mesh = new THREE.Mesh(geo, mat);
 
@@ -444,6 +442,20 @@
             bone.add(anchor);
             
             livePlanes[name] = { canvas: cvs, texture: tex, mesh: mesh, anchor: anchor };
+            updateLivePlaneCurvature(livePlanes[name]);
+        }
+
+        function updateLivePlaneCurvature(plane) {
+            const horizontalBend = parseFloat(c3dCurveHorizontal.value);
+            const verticalBend = parseFloat(c3dCurveVertical.value);
+            const positions = plane.mesh.geometry.attributes.position;
+            for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const y = positions.getY(i);
+                positions.setZ(i, -(horizontalBend * x * x + verticalBend * y * y));
+            }
+            positions.needsUpdate = true;
+            plane.mesh.geometry.computeVertexNormals();
         }
 
         function updateTextureCanvas(canvas, landmarks, indices, flipFor3D = false, rollAngle = 0) {
@@ -1143,6 +1155,8 @@
             eye_right: ['x', 'y', 'z'].map(axis => document.getElementById(`c3d-eye-right-${axis}`)),
             mouth: ['x', 'y', 'z'].map(axis => document.getElementById(`c3d-mouth-${axis}`))
         };
+        const c3dCurveHorizontal = document.getElementById('c3d-curve-horizontal');
+        const c3dCurveVertical = document.getElementById('c3d-curve-vertical');
         function reset3DFeatureOffsets() {
             Object.values(c3dFeatureOffsets).flat().forEach(slider => { slider.value = '0'; });
         }
@@ -1218,6 +1232,9 @@
         [cExpand, cFeather, cScale, cPanX, cPanY].forEach(el => el.addEventListener('input', () => generateCustomImage(false)));
         [cE1X, cE1Y, cE2X, cE2Y, cMX, cMY].forEach(el => el.addEventListener('input', updateCustomPreview));
         Object.values(c3dFeatureOffsets).flat().forEach(el => el.addEventListener('input', render3DStudioPreview));
+        [c3dCurveHorizontal, c3dCurveVertical].forEach(slider => slider.addEventListener('input', () => {
+            Object.values(livePlanes).forEach(updateLivePlaneCurvature);
+        }));
 
         function generateCustomImage(autoAlign = false) {
             if (!customBaseImage) return;
