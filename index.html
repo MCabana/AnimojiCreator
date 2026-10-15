@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
     
+    <!-- Three.js for 3D model parsing and procedural test avatar support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
     <style>
         body {
             font-family: 'Fredoka', sans-serif;
@@ -137,7 +141,7 @@
                 </button>
                 <button id="btn-custom-trigger" class="col-span-2 bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100">
                     <span class="text-xl">🖼</span>
-                    <span class="text-xs font-bold tracking-wide">ADD CUSTOM</span>
+                    <span class="text-xs font-bold tracking-wide">ADD CUSTOM / 3D</span>
                 </button>
             </div>
         </div>
@@ -155,7 +159,10 @@
         <div>
             <div class="flex justify-between items-center mb-3">
                 <h3 class="text-xs font-bold text-slate-400 tracking-wider">ADJUSTMENTS</h3>
-                <button id="btn-toggle-pip" class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm border border-slate-200">Show Live Feed</button>
+                <div class="flex gap-2">
+                    <button id="btn-recenter" class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm border border-slate-200">Recenter</button>
+                    <button id="btn-toggle-pip" class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm border border-slate-200">Show Live Feed</button>
+                </div>
             </div>
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
                 <div class="flex items-center gap-4">
@@ -174,18 +181,19 @@
         </div>
     </div>
 
-    <!-- Custom Character Modal -->
+    <!-- Custom Character / 3D Model Modal -->
     <div id="modal-custom" class="fixed inset-0 bg-slate-900/80 z-[100] hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-3xl w-full max-w-sm flex flex-col overflow-hidden shadow-2xl transform transition-all max-h-[95dvh]">
-            <div class="bg-indigo-50 p-3 border-b border-indigo-100 text-center shrink-0">
-                <h2 class="text-lg font-bold text-indigo-900">Custom Character</h2>
+            <div class="bg-indigo-50 p-3 border-b border-indigo-100 text-center shrink-0 flex items-center justify-between px-4">
+                <h2 class="text-base font-bold text-indigo-900">Custom Studio</h2>
+                <button id="btn-load-test-3d" class="text-xs font-bold bg-indigo-500 text-white px-3 py-1 rounded-full shadow-sm hover:bg-indigo-600 transition active:scale-95">Load Test 3D Avatar</button>
             </div>
             
             <div class="p-4 flex flex-col gap-4 overflow-y-auto">
-                <div class="relative w-full aspect-square bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZjFmNWY5Ii8+PHJlY3QgeD0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2UydThmMCIvPjxyZWN0IHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNlMmV4ZjAiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjVmOSIvPjwvc3ZnPg==')] rounded-2xl overflow-hidden border border-slate-200 shadow-inner shrink-0" id="custom-preview-container">
+                <div class="relative w-full aspect-square bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZjFmNWY5Ii8+PHJlY3QgeD0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2UydThmMCIvPjxyZWN0IHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNlMmV4ZjAiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjVmOSIvyz48L3N2Zz4=')] rounded-2xl overflow-hidden border border-slate-200 shadow-inner shrink-0" id="custom-preview-container">
                     <canvas id="custom-preview-canvas" class="w-full h-full absolute inset-0"></canvas>
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <p id="custom-status" class="text-sm font-bold text-slate-500 text-center px-4 bg-white/80 p-2 rounded-xl">Upload a photo to begin.</p>
+                        <p id="custom-status" class="text-sm font-bold text-slate-500 text-center px-4 bg-white/80 p-2 rounded-xl">Upload image/GLB or load test 3D avatar.</p>
                     </div>
                     
                     <!-- Draggable Interactive Guide Dots -->
@@ -193,22 +201,35 @@
                     <div id="guide-e2" class="guide-dot w-6 h-6 bg-blue-400 rounded-full hidden cursor-grab active:cursor-grabbing touch-none z-10 hover:scale-110 transition-transform"></div>
                     <div id="guide-mouth" class="guide-dot w-8 h-8 bg-rose-400 rounded-full hidden cursor-grab active:cursor-grabbing touch-none z-10 hover:scale-110 transition-transform"></div>
 
-                    <!-- Magnifying Glass Lens Overlay -->
-                    <div id="magnifier" class="absolute w-24 h-24 rounded-full border-4 border-white shadow-2xl overflow-hidden hidden pointer-events-none z-30 bg-slate-900">
+                    <!-- Magnifying Glass Lens Overlay with 2px precision reticle -->
+                    <div id="magnifier" class="absolute w-28 h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden hidden pointer-events-none z-30 bg-slate-900">
                         <canvas id="magnifier-canvas" class="absolute inset-0 w-full h-full"></canvas>
                         <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div class="w-1.5 h-1.5 bg-rose-500 rounded-full border border-white"></div>
+                            <div class="w-[2px] h-[2px] bg-rose-500 rounded-full border border-white"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="shrink-0">
-                    <input type="file" id="custom-file" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                <div class="shrink-0 flex gap-3">
+                    <label class="flex-1 relative cursor-pointer group">
+                        <input type="file" id="custom-image-file" accept="image/*" class="hidden">
+                        <div class="w-full text-center py-2.5 rounded-xl border-2 border-indigo-100 bg-indigo-50 group-hover:bg-indigo-100 transition flex flex-col items-center">
+                            <span class="text-indigo-500 text-lg mb-0.5">🖼️</span>
+                            <span class="text-[10px] font-bold text-indigo-700 tracking-wide">IMAGE</span>
+                        </div>
+                    </label>
+                    <label class="flex-1 relative cursor-pointer group">
+                        <input type="file" id="custom-3d-file" accept=".glb,.gltf" class="hidden">
+                        <div class="w-full text-center py-2.5 rounded-xl border-2 border-emerald-100 bg-emerald-50 group-hover:bg-emerald-100 transition flex flex-col items-center">
+                            <span class="text-emerald-500 text-lg mb-0.5">🧊</span>
+                            <span class="text-[10px] font-bold text-emerald-700 tracking-wide">3D MODEL</span>
+                        </div>
+                    </label>
                 </div>
 
                 <div id="custom-controls" class="hidden flex-col gap-3 shrink-0 pb-2">
                     <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <label class="flex items-center gap-2 text-xs font-bold text-slate-600" title="Lock the background in place">
+                        <label class="flex items-center gap-2 text-xs font-bold text-slate-600" title="Lock background in place">
                             <input type="checkbox" id="c-static" class="accent-emerald-400 w-4 h-4">
                             STATIC MODE
                         </label>
@@ -253,6 +274,25 @@
                     </div>
                 </div>
 
+                <!-- NEW: 3D Adjustments Panel (Hidden by default) -->
+                <div id="panel-3d-adjust" class="hidden flex-col gap-3 shrink-0 pb-2">
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2 relative">
+                        <p class="text-[10px] font-bold text-slate-400 mb-2">3D CAMERA & MODEL</p>
+                        <button id="btn-reset-orbit" class="absolute top-2 right-2 text-[9px] font-bold bg-slate-200 text-slate-600 px-2 py-1 rounded hover:bg-slate-300 transition active:scale-95 z-10">Reset Orbit</button>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-16">ZOOM</span><input type="range" id="c3d-cam-z" min="1" max="20" step="0.1" value="4" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-indigo-500"></div>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-16">HEIGHT</span><input type="range" id="c3d-cam-y" min="-5" max="5" step="0.1" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-indigo-500"></div>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-16">SCALE</span><input type="range" id="c3d-model-scale" min="0.1" max="5" step="0.01" value="1.0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-amber-500"></div>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
+                        <p class="text-[10px] font-bold text-slate-400 mb-2">VIRTUAL ATTACHMENTS (Relative to Head)</p>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">EYE HEIGHT</span><input type="range" id="c3d-eye-y" min="-2" max="2" step="0.01" value="0.15" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">EYE SPREAD</span><input type="range" id="c3d-eye-x" min="0" max="2" step="0.01" value="0.25" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">EYE DEPTH</span><input type="range" id="c3d-eye-z" min="-2" max="2" step="0.01" value="0.65" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-emerald-400"></div>
+                        <div class="flex items-center gap-2 pt-2 border-t border-slate-200"><span class="text-[10px] font-bold text-slate-400 w-20">MOUTH HEIGHT</span><input type="range" id="c3d-mouth-y" min="-2" max="2" step="0.01" value="-0.25" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-rose-400"></div>
+                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">MOUTH DEPTH</span><input type="range" id="c3d-mouth-z" min="-2" max="2" step="0.01" value="0.65" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-emerald-400"></div>
+                    </div>
+                </div>
+
                 <div class="flex gap-3 shrink-0 pt-2 border-t border-slate-100">
                     <button id="btn-custom-cancel" class="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-500 active:scale-95 transition">Cancel</button>
                     <button id="btn-custom-save" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold text-white active:scale-95 transition opacity-50 pointer-events-none">Save & Use</button>
@@ -262,6 +302,15 @@
     </div>
 
     <script type="module">
+        // Suppress MediaPipe's benign informational "error" logs
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('Created TensorFlow Lite XNNPACK delegate')) {
+                return; // Ignore this specific informational message
+            }
+            originalConsoleError.apply(console, args);
+        };
+
         import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
         const statusText = document.getElementById('status-text');
@@ -279,6 +328,7 @@
         const sliderNose = document.getElementById('slider-nose');
         const sliderMouth = document.getElementById('slider-mouth');
         const btnTogglePip = document.getElementById('btn-toggle-pip');
+        const btnRecenter = document.getElementById('btn-recenter');
 
         let faceLandmarker = null;
         let imageLandmarker = null; 
@@ -301,11 +351,159 @@
         let recordingTimer = null;
         let recordingSecondsLeft = 15;
 
-        // Custom Character State
+        // Recenter State
+        let offsetRoll = 0;
+        let offsetYaw = 0;
+        let offsetPitch = 0;
+        let requestRecenter = false;
+
+        // Custom Character / 3D Model State
         let customBaseImage = null; 
         let customFaceLandmarks = null; 
         let customImageMasked = null; 
-        const customSettings = { e1x: 0.35, e1y: 0.4, e2x: 0.65, e2y: 0.4, mx: 0.5, my: 0.7, isStatic: false };
+        let customBgDrawW = 256;
+        let customBgDrawH = 256;
+        let customStaticScaleMult = 1.0;
+        let model3DRenderer = null;
+        let model3DScene = null;
+        let model3DCamera = null;
+        let modelBones = {};
+        let isPreviewing3D = false; // Tracks if the 3D studio preview loop is running
+        
+        let loadedModelRoot = null;
+        let orbitAngleX = 0;
+        let orbitAngleY = 0;
+        let isDraggingOrbit = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        
+        // IK / Procedural Animation Smoothing State
+        let smoothedYaw = 0;
+        let smoothedPitch = 0;
+        let smoothedRoll = 0;
+        
+        const customSettings = { e1x: 0.35, e1y: 0.4, e2x: 0.65, e2y: 0.4, mx: 0.5, my: 0.7, isStatic: false, is3D: false };
+
+        // 3D Texture Plane System
+        let livePlanes = {};
+
+        function clearLivePlanes() {
+            Object.values(livePlanes).forEach(plane => {
+                if (plane.mesh && plane.mesh.parent) plane.mesh.parent.remove(plane.mesh);
+                if (plane.texture) plane.texture.dispose();
+                if (plane.mesh.material) plane.mesh.material.dispose();
+                if (plane.mesh.geometry) plane.mesh.geometry.dispose();
+            });
+            livePlanes = {};
+        }
+
+        function createLivePlane(bone, name, zOffset) {
+            const cvs = document.createElement('canvas');
+            cvs.width = 256; cvs.height = 256;
+            
+            // Draw placeholder shape so planes are visible before the camera detects a face
+            const ctxC = cvs.getContext('2d');
+            ctxC.fillStyle = name === 'mouth' ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.8)';
+            ctxC.beginPath();
+            if (name === 'mouth') ctxC.ellipse(128, 128, 80, 40, 0, 0, Math.PI * 2);
+            else ctxC.ellipse(128, 128, 40, 60, 0, 0, Math.PI * 2);
+            ctxC.fill();
+
+            const tex = new THREE.CanvasTexture(cvs);
+            // MeshBasicMaterial ensures the live video isn't darkened by scene shadows
+            // Added depthWrite: false to prevent transparent bounding boxes from cutting holes in each other
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+            
+            // Subdivide the plane into 16 horizontal segments so we can bend it
+            const geo = new THREE.PlaneGeometry(0.5, 0.5, 16, 1); 
+            
+            // Mathematically push the edges backward to wrap around the spherical head
+            const pos = geo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                // Parabolic curve: pushing the X edges backward on the Z axis
+                const z = -1.5 * (x * x); 
+                pos.setZ(i, z);
+            }
+            geo.computeVertexNormals();
+
+            const mesh = new THREE.Mesh(geo, mat);
+            
+            // Pop the plane slightly forward so it sits cleanly on top of the geometry mesh
+            mesh.position.set(0, 0, zOffset); 
+            bone.add(mesh);
+            
+            livePlanes[name] = { canvas: cvs, texture: tex, mesh: mesh };
+        }
+
+        function updateTextureCanvas(canvas, landmarks, indices, flipFor3D = false, rollAngle = 0, anchorTop = false) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!landmarks || indices.length === 0) return;
+            
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            
+            let minX = 1, maxX = 0, minY = 1, maxY = 0;
+            indices.forEach(idx => {
+                const pt = landmarks[idx];
+                if(pt.x < minX) minX = pt.x;
+                if(pt.x > maxX) maxX = pt.x;
+                if(pt.y < minY) minY = pt.y;
+                if(pt.y > maxY) maxY = pt.y;
+            });
+            
+            let anchorX = (minX + maxX) / 2;
+            let anchorY = (minY + maxY) / 2;
+            
+            if (anchorTop && indices === MOUTH_CONTOUR) {
+                anchorY = landmarks[13].y; // Anchor to the top lip
+            }
+            
+            const featureW = (maxX - minX) * vw;
+            const featureH = (maxY - minY) * vh;
+            // Scale to fit inside 256x256, leaving margin for blending
+            const scale = Math.min(canvas.width / featureW, canvas.height / featureH) * 0.75;
+            
+            ctx.save();
+            
+            // Shift the center of the drawing up to give the jaw room to drop
+            const drawCenterY = anchorTop ? canvas.height * 0.25 : canvas.height / 2;
+            ctx.translate(canvas.width / 2, drawCenterY);
+            
+            // Counter the physical camera roll so the texture is perfectly upright before 3D rotation
+            if (rollAngle !== 0) ctx.rotate(-rollAngle);
+            
+            if (flipFor3D) ctx.scale(-1, 1);
+            
+            ctx.beginPath();
+            indices.forEach((idx, i) => {
+                const pt = landmarks[idx];
+                const dx = ((1.0 - pt.x) - (1.0 - anchorX)) * vw * scale;
+                const dy = (pt.y - anchorY) * vh * scale;
+                if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
+            });
+            ctx.closePath();
+            
+            ctx.save();
+            ctx.clip();
+            ctx.scale(-1, 1);
+            const drawW = vw * scale;
+            const drawH = vh * scale;
+            ctx.drawImage(video, -anchorX * drawW, -anchorY * drawH, drawW, drawH);
+            ctx.restore();
+            
+            // Draw soft white blending edge
+            ctx.lineWidth = 15;
+            ctx.strokeStyle = '#ffffff';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 10;
+            ctx.stroke();
+            ctx.lineWidth = 8;
+            ctx.stroke();
+            
+            ctx.restore();
+        }
 
         const PALETTES = {
             bear: [
@@ -394,6 +592,27 @@
             canvas.width = canvas.offsetWidth * dpr;
             canvas.height = canvas.offsetHeight * dpr;
             
+            if (model3DRenderer && model3DCamera) {
+                model3DRenderer.setSize(canvas.width, canvas.height, false);
+                model3DCamera.aspect = canvas.width / canvas.height;
+                
+                // Respect saved custom camera settings if they exist
+                let baseZ = model3DCamera.userData.baseZ !== undefined ? model3DCamera.userData.baseZ : 4.0;
+                let baseY = model3DCamera.userData.baseY !== undefined ? model3DCamera.userData.baseY : 0.0;
+                
+                model3DCamera.position.x = 0; // Prevent orbit bleed into main scene
+                if (isFauxFullscreen) {
+                    model3DCamera.position.z = baseZ * 1.5; 
+                } else {
+                    model3DCamera.position.z = baseZ;
+                }
+                
+                model3DCamera.position.y = baseY;
+                model3DCamera.lookAt(0, baseY, 0);
+                
+                model3DCamera.updateProjectionMatrix();
+            }
+
             if (isCameraActive && video.videoWidth > 0) {
                 pipCanvas.width = video.videoWidth;
                 pipCanvas.height = video.videoHeight;
@@ -469,6 +688,10 @@
             
             const headRadius = Math.min(canvas.width, canvas.height) * 0.35;
             
+            // Dynamically scale the custom background variables
+            customBgDrawW = headRadius * 2.5;
+            customBgDrawH = headRadius * 2.5;
+            
             let landmarks = null;
             let angle = 0; 
             let yawX = 0;
@@ -491,7 +714,8 @@
                 
                 const dxRoll = ((1.0 - leftCorner.x) - (1.0 - rightCorner.x)) * vw;
                 const dyRoll = (leftCorner.y - rightCorner.y) * vh;
-                angle = Math.atan2(dyRoll, dxRoll);
+                let rawAngle = Math.atan2(dyRoll, dxRoll);
+                angle = rawAngle - offsetRoll;
                 
                 const faceWidthRatio = Math.sqrt(dxRoll * dxRoll + dyRoll * dyRoll) / vw;
                 
@@ -508,27 +732,62 @@
                     
                     const localYaw = (nX * uX + nY * uY) / faceWidthRatio; 
                     const rawPitch = (nX * vX + nY * vY) / faceWidthRatio;
-                    let localPitch = rawPitch - 0.30; 
                     
-                    yawX = localYaw * headRadius * 1.2;
+                    if (requestRecenter) {
+                        offsetRoll = rawAngle;
+                        offsetYaw = localYaw;
+                        offsetPitch = rawPitch - 0.30;
+                        requestRecenter = false;
+                        
+                        btnRecenter.textContent = "Centered!";
+                        btnRecenter.classList.add('bg-emerald-100', 'text-emerald-600', 'border-emerald-200');
+                        setTimeout(() => {
+                            btnRecenter.textContent = "Recenter";
+                            btnRecenter.classList.remove('bg-emerald-100', 'text-emerald-600', 'border-emerald-200');
+                        }, 1000);
+                    }
+
+                    let localPitch = (rawPitch - 0.30) - offsetPitch; 
+                    let adjustedYaw = localYaw - offsetYaw;
+                    
+                    yawX = adjustedYaw * headRadius * 1.2;
                     pitchY = localPitch * headRadius * 1.2;
+                } else if (requestRecenter) {
+                    requestRecenter = false; 
                 }
                 drawPIPVisualizer(landmarks);
             } else {
                 drawPIPVisualizer(null); 
             }
 
-            let customBgDrawW = headRadius * 2.4;
-            let customBgDrawH = customBgDrawW;
-            let customStaticScaleMult = 1.0;
-
-            if (selectedCharacter === 'custom' && customImageMasked) {
-                if (isCustomStatic) {
-                    const coverScale = Math.max(canvas.width / customImageMasked.width, canvas.height / customImageMasked.height);
-                    customBgDrawW = customImageMasked.width * coverScale;
-                    customBgDrawH = customImageMasked.height * coverScale;
-                    customStaticScaleMult = customBgDrawW / (headRadius * 2.4);
+            // 3D Model Animation Handling
+            if (selectedCharacter === 'custom' && customSettings.is3D && model3DRenderer) {
+                const activeCx = isCustomStatic ? screenCenterX : cx;
+                const activeCy = isCustomStatic ? screenCenterY : cy;
+                update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy);
+                
+                // Paint 2D live cutouts directly onto true 3D planes (Executes ALWAYS to ensure placeholders stay visible)
+                if (livePlanes.eye_left) { // Screen Left (User Right Eye)
+                    updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, false, angle);
+                    livePlanes.eye_left.texture.needsUpdate = true;
+                    livePlanes.eye_left.mesh.scale.setScalar(eyeScale * 1.3);
                 }
+                if (livePlanes.eye_right) { // Screen Right (User Left Eye)
+                    updateTextureCanvas(livePlanes.eye_right.canvas, landmarks, LEFT_EYE_CONTOUR, false, angle);
+                    livePlanes.eye_right.texture.needsUpdate = true;
+                    livePlanes.eye_right.mesh.scale.setScalar(eyeScale * 1.3);
+                }
+                if (livePlanes.mouth) {
+                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, false, angle, false);
+                    livePlanes.mouth.texture.needsUpdate = true;
+                    livePlanes.mouth.mesh.scale.setScalar(mouthScale * 1.3);
+                }
+
+                // Render the 3D scene and paint it onto the main 2D canvas
+                model3DRenderer.render(model3DScene, model3DCamera);
+                ctx.drawImage(model3DRenderer.domElement, 0, 0, canvas.width, canvas.height);
+                
+                return; // Early return prevents the 2D fallback from drawing floating features
             }
 
             const surfaceX = isCustomStatic ? screenCenterX : cx + yawX;
@@ -602,10 +861,10 @@
                 mTargetY = snoutY + headRadius * 0.40;
             }
 
-            const getRotatedPos = (targetX, targetY, isMouth = false) => {
+            const getRotatedPos = (targetX, targetY, isMouth = false, isEye = false) => {
                 let posAngle = angle;
                 if (isCustomStatic) {
-                    posAngle = isMouth ? angle : (angle * 0.1);
+                    posAngle = isMouth ? angle : (isEye ? (angle * 0.1) : 0);
                 }
                 const pivotX = isCustomStatic ? screenCenterX : cx;
                 const pivotY = isCustomStatic ? screenCenterY : cy;
@@ -619,9 +878,9 @@
                 };
             };
 
-            const rEyePos = getRotatedPos(rEyeTargetX, rEyeTargetY, false);
-            const lEyePos = getRotatedPos(lEyeTargetX, lEyeTargetY, false);
-            const mouthPos = getRotatedPos(mTargetX, mTargetY, true); 
+            const rEyePos = getRotatedPos(rEyeTargetX, rEyeTargetY, false, true);
+            const lEyePos = getRotatedPos(lEyeTargetX, lEyeTargetY, false, true);
+            const mouthPos = getRotatedPos(mTargetX, mTargetY, true, false); 
 
             // 2. Draw Snout Background
             if (selectedCharacter !== 'custom') {
@@ -658,7 +917,7 @@
                 
                 drawAlignedCutout(landmarks, RIGHT_EYE_CONTOUR, rEyePos.x, rEyePos.y, finalEyeScale, eyeDrawAngle, skinColor, null, 0.4);
                 drawAlignedCutout(landmarks, LEFT_EYE_CONTOUR, lEyePos.x, lEyePos.y, finalEyeScale, eyeDrawAngle, skinColor, null, 0.4);
-                drawAlignedCutout(landmarks, MOUTH_CONTOUR, mouthPos.x, mouthPos.y, finalMouthScale, mouthDrawAngle, skinColor, topLipPt, 1.0);
+                drawAlignedCutout(landmarks, MOUTH_CONTOUR, mouthPos.x, mouthPos.y, finalMouthScale, mouthDrawAngle, skinColor, null, 1.0);
             } else {
                 const currentEyeRad = headRadius * 0.2 * eyeScale * (isCustomStatic ? customStaticScaleMult : 1.0);
                 const currentPupilRad = headRadius * 0.08 * eyeScale * (isCustomStatic ? customStaticScaleMult : 1.0);
@@ -700,7 +959,375 @@
             }
         }
 
-        function drawAlignedCutout(landmarks, indices, targetX, targetY, scale, rollAngle, skinColor, anchorPt = null, featherScale = 1.0) {
+        // --- 3D Model Skeleton Parsing and Procedural Test Avatar Generator ---
+        function init3DCanvasRenderer() {
+            if (model3DRenderer) return;
+            
+            const w = canvas.width || 512;
+            const h = canvas.height || 512;
+            
+            model3DRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            model3DRenderer.setSize(w, h, false);
+            model3DScene = new THREE.Scene();
+            model3DCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
+            model3DCamera.position.set(0, 0, 4.0);
+            
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            model3DScene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(2, 4, 3);
+            model3DScene.add(dirLight);
+        }
+
+        function loadProceduralTest3DModel() {
+            init3DCanvasRenderer();
+            while(model3DScene.children.length > 2) {
+                model3DScene.remove(model3DScene.children[2]);
+            }
+
+            // Build hierarchical skeleton with exact requested bone names
+            const root = new THREE.Group();
+            root.name = "AvatarRoot";
+            root.position.y = -1.2; // Shift down to center the body in the camera view
+            root.userData.baseY = -1.2;
+            loadedModelRoot = root;
+
+            // 1. Spine 0 (Base Torso)
+            const spine0 = new THREE.Bone(); 
+            spine0.name = "spine_0";
+            const spine0Geo = new THREE.BoxGeometry(0.9, 0.7, 0.5);
+            const spineMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.6 });
+            const spine0Mesh = new THREE.Mesh(spine0Geo, spineMat);
+            spine0Mesh.position.y = 0.35; // Center mesh on the bone
+            spine0.add(spine0Mesh);
+
+            // 2. Spine 1 (Upper Torso)
+            const spine1 = new THREE.Bone(); 
+            spine1.name = "spine_1"; 
+            spine1.position.y = 0.7; // Attach to the top of spine_0
+            const spine1Geo = new THREE.BoxGeometry(0.8, 0.6, 0.45);
+            const spine1Mesh = new THREE.Mesh(spine1Geo, spineMat);
+            spine1Mesh.position.y = 0.3; // Center mesh on the bone
+            spine1.add(spine1Mesh);
+            spine0.add(spine1);
+
+            // 3. Neck (Capsule)
+            const neck = new THREE.Bone(); 
+            neck.name = "neck"; 
+            neck.position.y = 0.6; // Attach to the top of spine_1
+            const neckMat = new THREE.MeshStandardMaterial({ color: 0xfca5a5 });
+            
+            // Constructing a true capsule from a cylinder and spheres for universal compatibility
+            const neckMeshGroup = new THREE.Group();
+            const neckCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.4, 16), neckMat);
+            const neckTop = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), neckMat);
+            neckTop.position.y = 0.2;
+            const neckBot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), neckMat);
+            neckBot.position.y = -0.2;
+            neckMeshGroup.add(neckCyl); neckMeshGroup.add(neckTop); neckMeshGroup.add(neckBot);
+            
+            neckMeshGroup.position.y = 0.2; // Offset so the base starts at the bone
+            neck.add(neckMeshGroup);
+            spine1.add(neck);
+
+            // 4. Head (Sphere)
+            const head = new THREE.Bone(); 
+            head.name = "head"; 
+            head.position.y = 0.4; // Attach to the top of the neck
+            
+            const headMeshGeo = new THREE.SphereGeometry(0.7, 32, 32);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.3 });
+            const headMesh = new THREE.Mesh(headMeshGeo, headMat);
+            // Head bone is perfectly centered in the sphere
+            head.add(headMesh);
+            neck.add(head);
+
+            // Left and Right Eyes
+            const leftEyeBone = new THREE.Bone(); leftEyeBone.name = "eye_left"; leftEyeBone.position.set(-0.25, 0.15, 0.65);
+            const rightEyeBone = new THREE.Bone(); rightEyeBone.name = "eye_right"; rightEyeBone.position.set(0.25, 0.15, 0.65);
+            head.add(leftEyeBone);
+            head.add(rightEyeBone);
+
+            // Mouth Bone
+            const mouthBone = new THREE.Bone(); mouthBone.name = "mouth"; mouthBone.position.set(0, -0.25, 0.65);
+            head.add(mouthBone);
+
+            // Hat Socket and Box
+            const hatSocket = new THREE.Bone(); hatSocket.name = "hat_socket"; hatSocket.position.set(0, 0.65, 0);
+            head.add(hatSocket);
+            
+            // Build a literal Box structure for the hat
+            const hatGeo = new THREE.BoxGeometry(0.9, 0.15, 0.9);
+            const hatMatMesh = new THREE.MeshStandardMaterial({ color: 0xf59e0b });
+            const hatMeshBase = new THREE.Mesh(hatGeo, hatMatMesh);
+            hatMeshBase.position.y = 0.075; // Sit on the surface of the socket
+            
+            const hatTopGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const hatTopMesh = new THREE.Mesh(hatTopGeo, hatMatMesh);
+            hatTopMesh.position.y = 0.25 + 0.075; // Stack on the hat base
+            hatMeshBase.add(hatTopMesh);
+
+            hatSocket.add(hatMeshBase);
+
+            root.add(spine0);
+            model3DScene.add(root);
+
+            modelBones = {
+                spine_0: spine0,
+                spine_1: spine1,
+                neck: neck,
+                head: head,
+                eye_left: leftEyeBone,
+                eye_right: rightEyeBone,
+                mouth: mouthBone,
+                hat_socket: hatSocket
+            };
+
+            // Attach dynamic texture planes directly to the 3D bones
+            clearLivePlanes();
+            if(modelBones.eye_left) createLivePlane(modelBones.eye_left, 'eye_left', 0.16);
+            if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right', 0.16);
+            if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth', 0.06);
+
+            customSettings.is3D = true;
+            customSettings.isStatic = false;
+            document.getElementById('custom-status').style.display = 'none';
+            
+            // Switch UI to 3D controls instead of closing
+            document.getElementById('custom-controls').classList.add('hidden');
+            document.getElementById('custom-controls').classList.remove('flex');
+            document.getElementById('panel-3d-adjust').classList.remove('hidden');
+            document.getElementById('panel-3d-adjust').classList.add('flex');
+            btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
+            guides.forEach(g => g.classList.add('hidden'));
+
+            isPreviewing3D = true;
+            render3DStudioPreview();
+        }
+
+        function load3DModelFile(file) {
+            init3DCanvasRenderer();
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const arrayBuffer = e.target.result;
+                const loader = new THREE.GLTFLoader();
+                loader.parse(arrayBuffer, '', (gltf) => {
+                    while(model3DScene.children.length > 2) {
+                        model3DScene.remove(model3DScene.children[2]);
+                    }
+                    model3DScene.add(gltf.scene);
+                    loadedModelRoot = gltf.scene;
+                    loadedModelRoot.userData.baseY = 0;
+                    
+                    modelBones = {};
+                    gltf.scene.traverse((child) => {
+                        if (child.isBone || child.isObject3D) {
+                            const name = child.name.toLowerCase();
+                            if (name.includes('spine_0') || name === 'spine0') modelBones.spine_0 = child;
+                            else if (name.includes('spine_1') || name === 'spine1') modelBones.spine_1 = child;
+                            else if (name.includes('neck')) modelBones.neck = child;
+                            else if (name.includes('head')) modelBones.head = child;
+                            else if (name.includes('eye_left') || name.includes('lefteye') || name === 'eye.l') modelBones.eye_left = child;
+                            else if (name.includes('eye_right') || name.includes('righteye') || name === 'eye.r') modelBones.eye_right = child;
+                            else if (name.includes('mouth') || name.includes('jaw') || name.includes('lip')) modelBones.mouth = child;
+                            else if (name.includes('hat')) modelBones.hat_socket = child;
+                            else if (name.includes('glasses') || name.includes('eyewear')) modelBones.glasses_socket = child;
+                        }
+                    });
+
+                    if (!modelBones.head) {
+                        gltf.scene.traverse((child) => {
+                            if (child.isBone && !modelBones.head) modelBones.head = child;
+                        });
+                        
+                        // Fallback if model has absolutely no bones
+                        if (!modelBones.head) {
+                            modelBones.head = new THREE.Bone();
+                            modelBones.head.position.y = 1.0; // Estimate head height
+                            model3DScene.add(modelBones.head);
+                        }
+                    }
+
+                    // Generate virtual attachment bones if native ones are missing
+                    if (!modelBones.eye_left && modelBones.head) {
+                        modelBones.eye_left = new THREE.Bone();
+                        modelBones.eye_left.name = "eye_left_virtual";
+                        modelBones.head.add(modelBones.eye_left);
+                    }
+                    if (!modelBones.eye_right && modelBones.head) {
+                        modelBones.eye_right = new THREE.Bone();
+                        modelBones.eye_right.name = "eye_right_virtual";
+                        modelBones.head.add(modelBones.eye_right);
+                    }
+                    if (!modelBones.mouth && modelBones.head) {
+                        modelBones.mouth = new THREE.Bone();
+                        modelBones.mouth.name = "mouth_virtual";
+                        modelBones.head.add(modelBones.mouth);
+                    }
+
+                    // Attach dynamic texture planes directly to the 3D bones
+                    clearLivePlanes();
+                    if(modelBones.eye_left) createLivePlane(modelBones.eye_left, 'eye_left', 0.16);
+                    if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right', 0.16);
+                    if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth', 0.06);
+
+                    customSettings.is3D = true;
+                    customSettings.isStatic = false;
+                    document.getElementById('custom-status').style.display = 'none';
+                    
+                    // Switch UI to 3D controls instead of closing
+                    document.getElementById('custom-controls').classList.add('hidden');
+                    document.getElementById('custom-controls').classList.remove('flex');
+                    document.getElementById('panel-3d-adjust').classList.remove('hidden');
+                    document.getElementById('panel-3d-adjust').classList.add('flex');
+                    btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
+                    guides.forEach(g => g.classList.add('hidden'));
+
+                    isPreviewing3D = true;
+                    render3DStudioPreview();
+                }, undefined, (error) => {
+                    console.error('Error loading 3D model:', error);
+                    alert('Could not parse GLB/GLTF model. Please ensure valid format.');
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy) {
+            if (!modelBones.head) return;
+            
+            // Normalize raw input targets
+            const targetYaw = yaw / 100;
+            const targetPitch = pitch / 100;
+            const targetRoll = roll; 
+
+            // Procedural Interpolation: Smoothly ease the movement over time for natural follow-through
+            // Increased from 0.15 to 0.7 for much quicker, snappier responsiveness
+            smoothedYaw = THREE.MathUtils.lerp(smoothedYaw, targetYaw, 0.7);
+            smoothedPitch = THREE.MathUtils.lerp(smoothedPitch, targetPitch, 0.7);
+            smoothedRoll = THREE.MathUtils.lerp(smoothedRoll, targetRoll, 0.7);
+
+            // Define total expressive motion magnitude
+            // Reduced multipliers so perspective distortion (leaning) doesn't cause exaggerated rotation
+            const totalYaw = smoothedYaw * 1.0;
+            const totalPitch = smoothedPitch * 0.8;
+            const totalRoll = -smoothedRoll * 1.2;
+
+            let swayPitch = 0;
+            let swayRoll = 0;
+
+            // NEW: Translate the entire model root to follow the head position on screen
+            if (loadedModelRoot && cx !== undefined && cy !== undefined) {
+                // Normalize screen coordinates (-0.5 to 0.5)
+                const screenDx = (cx - canvas.width / 2) / canvas.width;
+                const screenDy = (cy - canvas.height / 2) / canvas.height;
+                
+                // Calculate physical space at current Z-depth
+                const aspect = canvas.width / canvas.height;
+                const frustumHeight = 2 * Math.tan((model3DCamera.fov * Math.PI / 180) / 2) * model3DCamera.position.z;
+                const frustumWidth = frustumHeight * aspect;
+                
+                // We reduce the hard translation from 0.7 to 0.3 so the hips only move slightly, 
+                // leaving the rest of the movement for the spine to visually bend!
+                const targetTransX = screenDx * frustumWidth * 0.3; 
+                const targetTransY = -screenDy * frustumHeight * 0.3;
+                
+                if (loadedModelRoot.userData.tx === undefined) {
+                    loadedModelRoot.userData.tx = 0;
+                    loadedModelRoot.userData.ty = 0;
+                }
+                
+                // Smoothly follow the translation
+                loadedModelRoot.userData.tx = THREE.MathUtils.lerp(loadedModelRoot.userData.tx, targetTransX, 0.4);
+                loadedModelRoot.userData.ty = THREE.MathUtils.lerp(loadedModelRoot.userData.ty, targetTransY, 0.4);
+                
+                loadedModelRoot.position.x = loadedModelRoot.userData.tx;
+                loadedModelRoot.position.y = loadedModelRoot.userData.baseY + loadedModelRoot.userData.ty;
+
+                // Calculate Procedural Body Sway (IK)
+                // When you lean, your spine bends. We use the raw screen offset to generate a tilt.
+                swayPitch = -screenDy * 1.0; // Leaning forward/back
+                swayRoll = -screenDx * 1.2;  // Leaning side to side
+            }
+
+            // Distribute the rotation procedurally down the hierarchy (Weights sum to 1.0)
+            const wSpine0 = 0.10; // Lower back moves slightly
+            const wSpine1 = 0.20; // Upper back bends a bit more
+            const wNeck = 0.30;   // Neck articulates heavily
+            const wHead = 0.40;   // Head completes the final rotation
+
+            if (modelBones.spine_0) {
+                modelBones.spine_0.rotation.y = totalYaw * wSpine0;
+                modelBones.spine_0.rotation.x = (totalPitch * wSpine0) + (swayPitch * 0.5);
+                modelBones.spine_0.rotation.z = (totalRoll * wSpine0) + (swayRoll * 0.5);
+            }
+            if (modelBones.spine_1) {
+                modelBones.spine_1.rotation.y = totalYaw * wSpine1;
+                modelBones.spine_1.rotation.x = (totalPitch * wSpine1) + (swayPitch * 0.5);
+                modelBones.spine_1.rotation.z = (totalRoll * wSpine1) + (swayRoll * 0.5);
+            }
+            if (modelBones.neck) {
+                modelBones.neck.rotation.y = totalYaw * wNeck;
+                // Neck slightly counter-bends to keep head upright naturally
+                modelBones.neck.rotation.x = (totalPitch * wNeck) - (swayPitch * 0.2);
+                modelBones.neck.rotation.z = (totalRoll * wNeck) - (swayRoll * 0.2);
+            }
+            if (modelBones.head) {
+                // Head just takes its normal expressive rotation
+                modelBones.head.rotation.y = totalYaw * wHead;
+                modelBones.head.rotation.x = totalPitch * wHead;
+                modelBones.head.rotation.z = totalRoll * wHead;
+            }
+
+            // Eyes shift slightly further in the direction of the gaze
+            if (modelBones.eye_left && modelBones.eye_right) {
+                // Drastically reduced from 0.8 to 0.05 to prevent eyes from spinning backwards into the head
+                const eyeGazeYaw = totalYaw * 0.05; 
+                modelBones.eye_left.rotation.y = eyeGazeYaw;
+                modelBones.eye_right.rotation.y = eyeGazeYaw;
+            }
+
+            // Procedural mouth interpolation
+            if (modelBones.mouth && landmarks) {
+                const topLip = landmarks[13];
+                const botLip = landmarks[14] || landmarks[17];
+                const mouthOpen = Math.abs(topLip.y - botLip.y);
+                
+                const targetScaleY = 1.0 + (mouthOpen * 6.0);
+                // Smooth jaw motion to prevent jittering during rapid speech
+                modelBones.mouth.scale.y = THREE.MathUtils.lerp(modelBones.mouth.scale.y, targetScaleY, 0.85);
+            }
+
+            // NEW: Translate the entire model root to follow the head position on screen
+            if (loadedModelRoot && cx !== undefined && cy !== undefined) {
+                // Normalize screen coordinates (-0.5 to 0.5)
+                const screenDx = (cx - canvas.width / 2) / canvas.width;
+                const screenDy = (cy - canvas.height / 2) / canvas.height;
+                
+                // Calculate physical space at current Z-depth
+                const aspect = canvas.width / canvas.height;
+                const frustumHeight = 2 * Math.tan((model3DCamera.fov * Math.PI / 180) / 2) * model3DCamera.position.z;
+                const frustumWidth = frustumHeight * aspect;
+                
+                // Map screen movement to 3D movement
+                const targetTransX = screenDx * frustumWidth * 0.7; // 0.7 keeps it nicely framed
+                const targetTransY = -screenDy * frustumHeight * 0.7;
+                
+                if (loadedModelRoot.userData.tx === undefined) {
+                    loadedModelRoot.userData.tx = 0;
+                    loadedModelRoot.userData.ty = 0;
+                }
+                
+                // Smoothly follow the translation
+                loadedModelRoot.userData.tx = THREE.MathUtils.lerp(loadedModelRoot.userData.tx, targetTransX, 0.5);
+                loadedModelRoot.userData.ty = THREE.MathUtils.lerp(loadedModelRoot.userData.ty, targetTransY, 0.5);
+                
+                loadedModelRoot.position.x = loadedModelRoot.userData.tx;
+                loadedModelRoot.position.y = loadedModelRoot.userData.baseY + loadedModelRoot.userData.ty;
+            }
+        }
+
+        function drawAlignedCutout(landmarks, indices, targetX, targetY, scale, rollAngle, skinColor, anchorPt = null, featherScale = 1.0, flipHorizontal = false) {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             let minX = 1, maxX = 0, minY = 1, maxY = 0;
@@ -718,6 +1345,11 @@
             ctx.save();
             ctx.translate(targetX, targetY);
             ctx.rotate(rollAngle);
+            
+            if (flipHorizontal) {
+                ctx.scale(-1, 1);
+            }
+            
             ctx.beginPath();
             indices.forEach((idx, i) => {
                 const pt = landmarks[idx];
@@ -890,6 +1522,7 @@
         const btnBird = document.getElementById('btn-bird');
         const btnPenguin = document.getElementById('btn-penguin');
         const btnCustomTrig = document.getElementById('btn-custom-trigger');
+        const btnLoadTest3D = document.getElementById('btn-load-test-3d');
         const selectVariant = document.getElementById('select-variant');
 
         function updateCharacterSelection(activeChar) {
@@ -922,6 +1555,7 @@
         btnDog.onclick = () => updateCharacterSelection('dog');
         btnBird.onclick = () => updateCharacterSelection('bird');
         btnPenguin.onclick = () => updateCharacterSelection('penguin');
+        btnLoadTest3D.onclick = () => loadProceduralTest3DModel();
 
         selectVariant.addEventListener('change', (e) => {
             selectedVariant = parseInt(e.target.value);
@@ -932,6 +1566,10 @@
         sliderEyes.addEventListener('input', (e) => { eyeScale = parseFloat(e.target.value); if(!isCameraActive) drawScene(); });
         sliderNose.addEventListener('input', (e) => { noseScale = parseFloat(e.target.value); if(!isCameraActive) drawScene(); });
         sliderMouth.addEventListener('input', (e) => { mouthScale = parseFloat(e.target.value); if(!isCameraActive) drawScene(); });
+
+        btnRecenter.addEventListener('click', () => {
+            requestRecenter = true;
+        });
 
         btnTogglePip.addEventListener('click', () => {
             showPip = !showPip;
@@ -952,7 +1590,8 @@
 
         // --- CUSTOM MODAL ADVANCED ---
         const modalCustom = document.getElementById('modal-custom');
-        const customFileInput = document.getElementById('custom-file');
+        const customImageInput = document.getElementById('custom-image-file');
+        const custom3DInput = document.getElementById('custom-3d-file');
         const customPreviewCanvas = document.getElementById('custom-preview-canvas');
         const customStatus = document.getElementById('custom-status');
         const customControls = document.getElementById('custom-controls');
@@ -972,6 +1611,18 @@
         const cE2X = document.getElementById('c-e2x'); const cE2Y = document.getElementById('c-e2y');
         const cMX = document.getElementById('c-mx');   const cMY = document.getElementById('c-my');
         
+        // 3D Adjustment Elements
+        const c3dCamZ = document.getElementById('c3d-cam-z');
+        const c3dCamY = document.getElementById('c3d-cam-y');
+        const c3dModelScale = document.getElementById('c3d-model-scale');
+        const c3dEyeY = document.getElementById('c3d-eye-y');
+        const c3dEyeX = document.getElementById('c3d-eye-x');
+        const c3dEyeZ = document.getElementById('c3d-eye-z');
+        const c3dMouthY = document.getElementById('c3d-mouth-y');
+        const c3dMouthZ = document.getElementById('c3d-mouth-z');
+        const btnResetOrbit = document.getElementById('btn-reset-orbit');
+        const panel3dAdjust = document.getElementById('panel-3d-adjust');
+
         const btnCustomCancel = document.getElementById('btn-custom-cancel');
         const btnCustomSave = document.getElementById('btn-custom-save');
         const guides = [document.getElementById('guide-e1'), document.getElementById('guide-e2'), document.getElementById('guide-mouth')];
@@ -984,9 +1635,20 @@
             modalCustom.classList.remove('hidden');
             modalCustom.classList.add('flex');
             
-            if(customImageMasked) {
+            if(customSettings.is3D) {
+                customControls.classList.add('hidden');
+                customControls.classList.remove('flex');
+                panel3dAdjust.classList.remove('hidden');
+                panel3dAdjust.classList.add('flex');
+                guides.forEach(g => g.classList.add('hidden'));
+                btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
+                isPreviewing3D = true;
+                render3DStudioPreview();
+            } else if(customImageMasked) {
                 customControls.classList.remove('hidden');
                 customControls.classList.add('flex');
+                panel3dAdjust.classList.add('hidden');
+                panel3dAdjust.classList.remove('flex');
                 guides.forEach(g => g.classList.remove('hidden'));
                 btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
                 updateCustomPreview();
@@ -994,19 +1656,28 @@
                 customStatus.style.display = 'block';
                 customControls.classList.add('hidden');
                 customControls.classList.remove('flex');
+                panel3dAdjust.classList.add('hidden');
+                panel3dAdjust.classList.remove('flex');
             }
         });
 
         btnCustomCancel.addEventListener('click', () => {
             modalCustom.classList.add('hidden');
             modalCustom.classList.remove('flex');
+            isPreviewing3D = false;
         });
 
-        customFileInput.addEventListener('change', async (e) => {
-            if (!e.target.files[0] || !imageLandmarker) return;
+        custom3DInput.addEventListener('change', async (e) => {
+            if (!e.target.files[0]) return;
+            load3DModelFile(e.target.files[0]);
+            e.target.value = ''; // Reset input to allow selecting the same file again
+        });
+
+        customImageInput.addEventListener('change', async (e) => {
+            if (!e.target.files[0]) return;
             const file = e.target.files[0];
-            const reader = new FileReader();
             
+            const reader = new FileReader();
             customStatus.style.display = 'block';
             customStatus.textContent = "Detecting Face Layout...";
             customControls.classList.add('hidden');
@@ -1033,7 +1704,10 @@
                         const workCtx = workCanvas.getContext('2d');
                         workCtx.drawImage(img, 0, 0, sw, sh);
 
-                        const results = imageLandmarker.detect(workCanvas);
+                        let results = { faceLandmarks: [] };
+                        if (imageLandmarker) {
+                            results = imageLandmarker.detect(workCanvas);
+                        }
                         customBaseImage = workCanvas;
                         
                         if (results.faceLandmarks && results.faceLandmarks.length > 0) {
@@ -1047,8 +1721,8 @@
                             panelScale.classList.add('hidden');
                         } else {
                             customFaceLandmarks = null;
-                            customStatus.textContent = "No face found. Manual mode activated.";
-                            setTimeout(() => { customStatus.style.display = 'none'; }, 3000);
+                            customStatus.textContent = "Manual placement mode activated.";
+                            setTimeout(() => { customStatus.style.display = 'none'; }, 2000);
                             
                             cUseMask.checked = false;
                             cUseMask.disabled = true;
@@ -1063,9 +1737,14 @@
                         btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
                         guides.forEach(g => g.classList.remove('hidden'));
                         
-                        generateCustomImage(!!customFaceLandmarks); 
+                        customSettings.is3D = false;
+            generateCustomImage(!!customFaceLandmarks); 
+            
+            panel3dAdjust.classList.add('hidden');
+            panel3dAdjust.classList.remove('flex');
+            isPreviewing3D = false;
                         
-                    } catch (fatalErr) {
+        } catch (fatalErr) {
                         console.error("Fatal error processing image", fatalErr);
                         customStatus.textContent = "Error processing image.";
                     }
@@ -1073,6 +1752,7 @@
                 img.src = event.target.result;
             };
             reader.readAsDataURL(file);
+            e.target.value = ''; // Reset input
         });
 
         cUseMask.addEventListener('change', () => {
@@ -1091,7 +1771,6 @@
         });
 
         [cExpand, cFeather, cScale, cPanX, cPanY].forEach(el => el.addEventListener('input', () => generateCustomImage(false)));
-
         [cE1X, cE1Y, cE2X, cE2Y, cMX, cMY].forEach(el => el.addEventListener('input', updateCustomPreview));
 
         function generateCustomImage(autoAlign = false) {
@@ -1184,6 +1863,10 @@
                 cE1X.value = e1.x; cE1Y.value = e1.y;
                 cE2X.value = e2.x; cE2Y.value = e2.y;
                 cMX.value = m.x; cMY.value = m.y;
+            } else if (!autoAlign && !customFaceLandmarks) {
+                cE1X.value = 0.35; cE1Y.value = 0.4;
+                cE2X.value = 0.65; cE2Y.value = 0.4;
+                cMX.value = 0.5; cMY.value = 0.7;
             }
 
             const img = new Image();
@@ -1210,15 +1893,13 @@
             
             document.getElementById('guide-e1').style.left = `${e1x * 100}%`;
             document.getElementById('guide-e1').style.top = `${e1y * 100}%`;
-            
             document.getElementById('guide-e2').style.left = `${e2x * 100}%`;
             document.getElementById('guide-e2').style.top = `${e2y * 100}%`;
-            
             document.getElementById('guide-mouth').style.left = `${mx * 100}%`;
             document.getElementById('guide-mouth').style.top = `${my * 100}%`;
         }
 
-        // --- Drag & Drop Features with Magnifier ---
+        // --- Drag & Drop Features with 2px Precision Magnifier Lens ---
         let draggedGuide = null;
         const dotMapping = {
             'guide-e1': { x: cE1X, y: cE1Y },
@@ -1262,23 +1943,23 @@
                 mapped.x.value = normX;
                 mapped.y.value = normY;
                 updateCustomPreview();
-                updateMagnifier(clientX, clientX, clientY, rect);
+                updateMagnifier(clientX, clientY, rect);
             }
         }
 
-        function updateMagnifier(x, clientX, clientY, rect) {
+        function updateMagnifier(clientX, clientY, rect) {
             if(!customImageMasked) return;
-            const mw = magnifierCanvas.width = 96;
-            const mh = magnifierCanvas.height = 96;
+            const mw = magnifierCanvas.width = 112;
+            const mh = magnifierCanvas.height = 112;
             magnifierCtx.clearRect(0,0,mw,mh);
             
             magnifierCtx.save();
-            magnifierCtx.imageSmoothingEnabled = false; // Pixelated zoom for accuracy
+            magnifierCtx.imageSmoothingEnabled = false; 
             
             const targetX = clientX - rect.left;
             const targetY = clientY - rect.top;
             
-            const zoomFactor = 4.0;
+            const zoomFactor = 5.0;
             const srcSizeW = mw / zoomFactor;
             const srcSizeH = mh / zoomFactor;
             
@@ -1296,14 +1977,64 @@
             
             magnifierCtx.restore();
 
-            // Position magnifier near touch/cursor
             let magLeft = targetX + 20;
-            let magTop = targetY - 110;
-            if(magLeft + 96 > rect.width) magLeft = targetX - 116;
+            let magTop = targetY - 120;
+            if(magLeft + 112 > rect.width) magLeft = targetX - 132;
             if(magTop < 0) magTop = targetY + 20;
 
             magnifier.style.left = `${magLeft}px`;
             magnifier.style.top = `${magTop}px`;
+        }
+
+        // Live 3D Preview Loop for the Modal
+        function render3DStudioPreview() {
+            if (!isPreviewing3D || !model3DRenderer || !model3DScene || !model3DCamera) return;
+            
+            // Apply scale and orbit
+            if (loadedModelRoot) {
+                const s = parseFloat(c3dModelScale.value);
+                loadedModelRoot.scale.set(s, s, s);
+                loadedModelRoot.rotation.y = orbitAngleX;
+                loadedModelRoot.rotation.x = orbitAngleY;
+            }
+
+            // Apply Slider Values to Virtual Bones
+            if (modelBones.head && modelBones.eye_left && modelBones.eye_right && modelBones.mouth) {
+                const eyeY = parseFloat(c3dEyeY.value);
+                const eyeX = parseFloat(c3dEyeX.value);
+                const eyeZ = parseFloat(c3dEyeZ.value);
+                const mouthY = parseFloat(c3dMouthY.value);
+                const mouthZ = parseFloat(c3dMouthZ.value);
+                
+                modelBones.eye_left.position.set(-eyeX, eyeY, eyeZ);
+                modelBones.eye_right.position.set(eyeX, eyeY, eyeZ);
+                modelBones.mouth.position.set(0, mouthY, mouthZ);
+            }
+            
+            // Apply Slider Values to Camera
+            model3DCamera.position.z = parseFloat(c3dCamZ.value);
+            model3DCamera.position.y = parseFloat(c3dCamY.value);
+            model3DCamera.lookAt(0, model3DCamera.position.y, 0);
+            
+            // Render to Preview Canvas
+            const cvs = customPreviewCanvas;
+            const w = cvs.offsetWidth || 256;
+            const h = cvs.offsetHeight || 256;
+            cvs.width = w;
+            cvs.height = h;
+            
+            model3DRenderer.setSize(w, h, false);
+            model3DCamera.aspect = w / h;
+            model3DCamera.updateProjectionMatrix();
+            
+            model3DRenderer.render(model3DScene, model3DCamera);
+            
+            const ctxC = cvs.getContext('2d');
+            ctxC.clearRect(0, 0, w, h);
+            ctxC.drawImage(model3DRenderer.domElement, 0, 0, w, h);
+            
+            // Keep looping as long as modal is open
+            requestAnimationFrame(render3DStudioPreview);
         }
 
         function endDrag() {
@@ -1320,6 +2051,48 @@
             g.addEventListener('touchstart', startDrag, {passive: false});
         });
 
+        // --- 3D Preview Orbit Controls ---
+        customPreviewCanvas.addEventListener('mousedown', (e) => {
+            if(!isPreviewing3D) return;
+            isDraggingOrbit = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+        window.addEventListener('mousemove', (e) => {
+            if(!isDraggingOrbit || !isPreviewing3D) return;
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+            orbitAngleX += deltaX * 0.01;
+            orbitAngleY += deltaY * 0.01;
+            orbitAngleY = Math.max(-Math.PI/2, Math.min(Math.PI/2, orbitAngleY));
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+        window.addEventListener('mouseup', () => { isDraggingOrbit = false; });
+        
+        customPreviewCanvas.addEventListener('touchstart', (e) => {
+            if(!isPreviewing3D) return;
+            isDraggingOrbit = true;
+            lastMouseX = e.touches[0].clientX;
+            lastMouseY = e.touches[0].clientY;
+        }, {passive: true});
+        window.addEventListener('touchmove', (e) => {
+            if(!isDraggingOrbit || !isPreviewing3D) return;
+            const deltaX = e.touches[0].clientX - lastMouseX;
+            const deltaY = e.touches[0].clientY - lastMouseY;
+            orbitAngleX += deltaX * 0.01;
+            orbitAngleY += deltaY * 0.01;
+            orbitAngleY = Math.max(-Math.PI/2, Math.min(Math.PI/2, orbitAngleY));
+            lastMouseX = e.touches[0].clientX;
+            lastMouseY = e.touches[0].clientY;
+        }, {passive: true});
+        window.addEventListener('touchend', () => { isDraggingOrbit = false; });
+
+        btnResetOrbit.addEventListener('click', () => {
+            orbitAngleX = 0;
+            orbitAngleY = 0;
+        });
+
         btnCustomSave.addEventListener('click', () => {
             customSettings.e1x = parseFloat(cE1X.value);
             customSettings.e1y = parseFloat(cE1Y.value);
@@ -1329,9 +2102,31 @@
             customSettings.my = parseFloat(cMY.value);
             customSettings.isStatic = cStatic.checked;
             
+            // Save 3D Camera settings so they persist in the main view
+            if (customSettings.is3D && model3DCamera) {
+                model3DCamera.position.z = parseFloat(c3dCamZ.value);
+                model3DCamera.position.y = parseFloat(c3dCamY.value);
+                model3DCamera.lookAt(0, model3DCamera.position.y, 0);
+                
+                // Store base camera positions to restore after fullscreen toggle
+                model3DCamera.userData.baseZ = model3DCamera.position.z;
+                model3DCamera.userData.baseY = model3DCamera.position.y;
+            }
+
+            // Reset orbit so it doesn't leave the main character facing backward
+            if (loadedModelRoot) {
+                loadedModelRoot.rotation.x = 0;
+                loadedModelRoot.rotation.y = 0;
+            }
+            orbitAngleX = 0;
+            orbitAngleY = 0;
+
             modalCustom.classList.add('hidden');
             modalCustom.classList.remove('flex');
+            isPreviewing3D = false;
+            
             updateCharacterSelection('custom');
+            resizeCanvases(); // Ensure main renderer picks up changes immediately
         });
 
         const btnRecord = document.getElementById('btn-record');
