@@ -282,13 +282,30 @@
                         <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-16">ZOOM</span><input type="range" id="c3d-cam-z" min="1" max="20" step="0.1" value="4" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-indigo-500"></div>
                         <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-16">HEIGHT</span><input type="range" id="c3d-cam-y" min="-5" max="5" step="0.1" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-indigo-500"></div>
                     </div>
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
-                        <p class="text-[10px] font-bold text-slate-400 mb-2">VIRTUAL ATTACHMENTS (Relative to Head)</p>
-                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">EYE HEIGHT</span><input type="range" id="c3d-eye-y" min="-2" max="2" step="0.01" value="0.15" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
-                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">EYE SPREAD</span><input type="range" id="c3d-eye-x" min="0" max="2" step="0.01" value="0.25" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
-                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">EYE DEPTH</span><input type="range" id="c3d-eye-z" min="-2" max="2" step="0.01" value="0.65" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
-                        <div class="flex items-center gap-2 pt-2 border-t border-slate-200"><span class="text-[10px] font-bold text-slate-400 w-20">MOUTH HEIGHT</span><input type="range" id="c3d-mouth-y" min="-2" max="2" step="0.01" value="-0.25" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-rose-400"></div>
-                        <div class="flex items-center gap-2"><span class="text-[10px] font-bold text-slate-400 w-20">MOUTH DEPTH</span><input type="range" id="c3d-mouth-z" min="-2" max="2" step="0.01" value="0.65" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-rose-400"></div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-3">
+                        <p class="text-[10px] font-bold text-slate-400">FEATURE POSITION FINE-TUNING (Offsets from named bones)</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-blue-400">LEFT EYE OFFSET</p>
+                                <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400 w-3">X</span><input type="range" id="c3d-eye-left-x" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                                <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400 w-3">Y</span><input type="range" id="c3d-eye-left-y" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                                <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400 w-3">Z</span><input type="range" id="c3d-eye-left-z" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                            </div>
+                            <div class="space-y-1">
+                                <p class="text-[9px] font-bold text-blue-400">RIGHT EYE OFFSET</p>
+                                <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400 w-3">X</span><input type="range" id="c3d-eye-right-x" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                                <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400 w-3">Y</span><input type="range" id="c3d-eye-right-y" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                                <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400 w-3">Z</span><input type="range" id="c3d-eye-right-z" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-blue-400"></div>
+                            </div>
+                            <div class="space-y-1 col-span-2 pt-2 border-t border-slate-200">
+                                <p class="text-[9px] font-bold text-rose-400">MOUTH OFFSET</p>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400">X</span><input type="range" id="c3d-mouth-x" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-rose-400"></div>
+                                    <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400">Y</span><input type="range" id="c3d-mouth-y" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-rose-400"></div>
+                                    <div class="flex items-center gap-1"><span class="text-[9px] text-slate-400">Z</span><input type="range" id="c3d-mouth-z" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none accent-rose-400"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -796,6 +813,7 @@
 
         function loadProceduralTest3DModel() {
             init3DCanvasRenderer();
+            reset3DFeatureOffsets();
             while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
 
             const root = new THREE.Group(); root.name = "AvatarRoot";
@@ -817,13 +835,74 @@
             const head = new THREE.Bone(); head.name = "head"; head.position.y = 0.4;
             head.add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 32, 32), new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.3 }))); neck.add(head);
 
-            const leftEyeBone = new THREE.Bone(); leftEyeBone.name = "eye_left"; head.add(leftEyeBone);
-            const rightEyeBone = new THREE.Bone(); rightEyeBone.name = "eye_right"; head.add(rightEyeBone);
-            const mouthBone = new THREE.Bone(); mouthBone.name = "mouth"; head.add(mouthBone);
+            const leftEyeBone = new THREE.Bone(); leftEyeBone.name = "eye_left"; leftEyeBone.position.set(-0.25, 0.15, 0.65); head.add(leftEyeBone);
+            const rightEyeBone = new THREE.Bone(); rightEyeBone.name = "eye_right"; rightEyeBone.position.set(0.25, 0.15, 0.65); head.add(rightEyeBone);
+            const mouthBone = new THREE.Bone(); mouthBone.name = "mouth"; mouthBone.position.set(0, -0.25, 0.65); head.add(mouthBone);
 
             root.add(spine0); model3DScene.add(root);
 
             modelBones = { spine_0: spine0, spine_1: spine1, neck: neck, head: head, eye_left: leftEyeBone, eye_right: rightEyeBone, mouth: mouthBone };
+
+            Object.values(modelBones).forEach(bone => {
+                if (bone) {
+                    bone.userData.initRot = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+                    bone.userData.initScaleY = bone.scale.y;
+                }
+            });
+
+            clearLivePlanes();
+            if(modelBones.eye_left) createLivePlane(modelBones.eye_left, 'eye_left');
+            if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right');
+            if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
+
+            customSettings.is3D = true; customSettings.isStatic = false;
+            document.getElementById('custom-status').style.display = 'none';
+            document.getElementById('custom-controls').classList.add('hidden'); document.getElementById('custom-controls').classList.remove('flex');
+            document.getElementById('panel-3d-adjust').classList.remove('hidden'); document.getElementById('panel-3d-adjust').classList.add('flex');
+            btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
+            guides.forEach(g => g.classList.add('hidden'));
+
+            isPreviewing3D = true; render3DStudioPreview();
+        }
+
+        function loadTest3DModel() {
+            init3DCanvasRenderer();
+            const loader = new THREE.GLTFLoader();
+            loader.load(new URL('character.glb', document.baseURI).href, (gltf) => {
+                initializeLoaded3DModel(gltf);
+            }, undefined, () => {
+                loadProceduralTest3DModel();
+            });
+        }
+
+        function initializeLoaded3DModel(gltf) {
+            reset3DFeatureOffsets();
+            while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
+            model3DScene.add(gltf.scene);
+            loadedModelRoot = gltf.scene; loadedModelRoot.userData.baseY = 0;
+
+            modelBones = {};
+            gltf.scene.traverse((child) => {
+                if (child.isBone || child.isObject3D) {
+                    const name = child.name.toLowerCase();
+                    if (name.includes('spine_0') || name === 'spine0') modelBones.spine_0 = child;
+                    else if (name.includes('spine_1') || name === 'spine1') modelBones.spine_1 = child;
+                    else if (name.includes('neck')) modelBones.neck = child;
+                    else if (name.includes('head')) modelBones.head = child;
+                    else if (name.includes('eye_left') || name.includes('lefteye') || name === 'eye.l') modelBones.eye_left = child;
+                    else if (name.includes('eye_right') || name.includes('righteye') || name === 'eye.r') modelBones.eye_right = child;
+                    else if (name.includes('mouth') || name.includes('jaw') || name.includes('lip')) modelBones.mouth = child;
+                }
+            });
+
+            if (!modelBones.head) {
+                gltf.scene.traverse((child) => { if (child.isBone && !modelBones.head) modelBones.head = child; });
+                if (!modelBones.head) { modelBones.head = new THREE.Bone(); modelBones.head.position.y = 1.0; model3DScene.add(modelBones.head); }
+            }
+
+            if (!modelBones.eye_left && modelBones.head) { modelBones.eye_left = new THREE.Bone(); modelBones.eye_left.name = "eye_left_virtual"; modelBones.eye_left.position.set(-0.25, 0.15, 0.65); modelBones.head.add(modelBones.eye_left); }
+            if (!modelBones.eye_right && modelBones.head) { modelBones.eye_right = new THREE.Bone(); modelBones.eye_right.name = "eye_right_virtual"; modelBones.eye_right.position.set(0.25, 0.15, 0.65); modelBones.head.add(modelBones.eye_right); }
+            if (!modelBones.mouth && modelBones.head) { modelBones.mouth = new THREE.Bone(); modelBones.mouth.name = "mouth_virtual"; modelBones.mouth.position.set(0, -0.25, 0.65); modelBones.head.add(modelBones.mouth); }
 
             Object.values(modelBones).forEach(bone => {
                 if (bone) {
@@ -853,53 +932,7 @@
             reader.onload = (e) => {
                 const loader = new THREE.GLTFLoader();
                 loader.parse(e.target.result, '', (gltf) => {
-                    while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
-                    model3DScene.add(gltf.scene);
-                    loadedModelRoot = gltf.scene; loadedModelRoot.userData.baseY = 0;
-                    
-                    modelBones = {};
-                    gltf.scene.traverse((child) => {
-                        if (child.isBone || child.isObject3D) {
-                            const name = child.name.toLowerCase();
-                            if (name.includes('spine_0') || name === 'spine0') modelBones.spine_0 = child;
-                            else if (name.includes('spine_1') || name === 'spine1') modelBones.spine_1 = child;
-                            else if (name.includes('neck')) modelBones.neck = child;
-                            else if (name.includes('head')) modelBones.head = child;
-                            else if (name.includes('eye_left') || name.includes('lefteye') || name === 'eye.l') modelBones.eye_left = child;
-                            else if (name.includes('eye_right') || name.includes('righteye') || name === 'eye.r') modelBones.eye_right = child;
-                            else if (name.includes('mouth') || name.includes('jaw') || name.includes('lip')) modelBones.mouth = child;
-                        }
-                    });
-
-                    if (!modelBones.head) {
-                        gltf.scene.traverse((child) => { if (child.isBone && !modelBones.head) modelBones.head = child; });
-                        if (!modelBones.head) { modelBones.head = new THREE.Bone(); modelBones.head.position.y = 1.0; model3DScene.add(modelBones.head); }
-                    }
-
-                    if (!modelBones.eye_left && modelBones.head) { modelBones.eye_left = new THREE.Bone(); modelBones.eye_left.name = "eye_left_virtual"; modelBones.head.add(modelBones.eye_left); }
-                    if (!modelBones.eye_right && modelBones.head) { modelBones.eye_right = new THREE.Bone(); modelBones.eye_right.name = "eye_right_virtual"; modelBones.head.add(modelBones.eye_right); }
-                    if (!modelBones.mouth && modelBones.head) { modelBones.mouth = new THREE.Bone(); modelBones.mouth.name = "mouth_virtual"; modelBones.head.add(modelBones.mouth); }
-
-                    Object.values(modelBones).forEach(bone => {
-                        if (bone) {
-                            bone.userData.initRot = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
-                            bone.userData.initScaleY = bone.scale.y;
-                        }
-                    });
-
-                    clearLivePlanes();
-                    if(modelBones.eye_left) createLivePlane(modelBones.eye_left, 'eye_left');
-                    if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right');
-                    if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
-
-                    customSettings.is3D = true; customSettings.isStatic = false;
-                    document.getElementById('custom-status').style.display = 'none';
-                    document.getElementById('custom-controls').classList.add('hidden'); document.getElementById('custom-controls').classList.remove('flex');
-                    document.getElementById('panel-3d-adjust').classList.remove('hidden'); document.getElementById('panel-3d-adjust').classList.add('flex');
-                    btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
-                    guides.forEach(g => g.classList.add('hidden'));
-
-                    isPreviewing3D = true; render3DStudioPreview();
+                    initializeLoaded3DModel(gltf);
                 }, undefined, (error) => { alert('Could not parse GLB/GLTF model.'); });
             };
             reader.readAsArrayBuffer(file);
@@ -1065,7 +1098,7 @@
         }
 
         btnBear.onclick = () => updateCharacterSelection('bear');
-        btnLoadTest3D.onclick = () => loadProceduralTest3DModel();
+        btnLoadTest3D.onclick = () => loadTest3DModel();
 
         selectVariant.addEventListener('change', (e) => { selectedVariant = parseInt(e.target.value); savedVariants[selectedCharacter] = selectedVariant; if(!isCameraActive) drawScene(); });
         sliderEyes.addEventListener('input', (e) => { eyeScale = parseFloat(e.target.value); if(!isCameraActive) drawScene(); });
@@ -1105,8 +1138,14 @@
         
         const c3dCamZ = document.getElementById('c3d-cam-z'); const c3dCamY = document.getElementById('c3d-cam-y');
         const c3dModelScale = document.getElementById('c3d-model-scale');
-        const c3dEyeY = document.getElementById('c3d-eye-y'); const c3dEyeX = document.getElementById('c3d-eye-x'); const c3dEyeZ = document.getElementById('c3d-eye-z');
-        const c3dMouthY = document.getElementById('c3d-mouth-y'); const c3dMouthZ = document.getElementById('c3d-mouth-z');
+        const c3dFeatureOffsets = {
+            eye_left: ['x', 'y', 'z'].map(axis => document.getElementById(`c3d-eye-left-${axis}`)),
+            eye_right: ['x', 'y', 'z'].map(axis => document.getElementById(`c3d-eye-right-${axis}`)),
+            mouth: ['x', 'y', 'z'].map(axis => document.getElementById(`c3d-mouth-${axis}`))
+        };
+        function reset3DFeatureOffsets() {
+            Object.values(c3dFeatureOffsets).flat().forEach(slider => { slider.value = '0'; });
+        }
         const btnResetOrbit = document.getElementById('btn-reset-orbit'); const panel3dAdjust = document.getElementById('panel-3d-adjust');
 
         const btnCustomCancel = document.getElementById('btn-custom-cancel'); const btnCustomSave = document.getElementById('btn-custom-save');
@@ -1178,6 +1217,7 @@
 
         [cExpand, cFeather, cScale, cPanX, cPanY].forEach(el => el.addEventListener('input', () => generateCustomImage(false)));
         [cE1X, cE1Y, cE2X, cE2Y, cMX, cMY].forEach(el => el.addEventListener('input', updateCustomPreview));
+        Object.values(c3dFeatureOffsets).flat().forEach(el => el.addEventListener('input', render3DStudioPreview));
 
         function generateCustomImage(autoAlign = false) {
             if (!customBaseImage) return;
@@ -1264,17 +1304,10 @@
                 loadedModelRoot.rotation.x = orbitAngleY; 
             }
             
-            if (livePlanes.eye_left && livePlanes.eye_right && livePlanes.mouth) {
-                const eyeY = parseFloat(c3dEyeY.value);
-                const eyeX = parseFloat(c3dEyeX.value);
-                const eyeDepth = parseFloat(c3dEyeZ.value);
-                const mouthY = parseFloat(c3dMouthY.value);
-                const mouthDepth = c3dMouthZ ? parseFloat(c3dMouthZ.value) : parseFloat(c3dEyeZ.value);
-
-                livePlanes.eye_left.mesh.position.set(-eyeX, eyeY, eyeDepth);
-                livePlanes.eye_right.mesh.position.set(eyeX, eyeY, eyeDepth);
-                livePlanes.mouth.mesh.position.set(0, mouthY, mouthDepth);
-            }
+            Object.entries(c3dFeatureOffsets).forEach(([name, sliders]) => {
+                const plane = livePlanes[name];
+                if (plane) plane.mesh.position.set(...sliders.map(slider => parseFloat(slider.value)));
+            });
 
             model3DCamera.position.z = parseFloat(c3dCamZ.value); 
             model3DCamera.position.y = parseFloat(c3dCamY.value); 
