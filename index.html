@@ -91,7 +91,7 @@
         </div>
     </div>
 
-    <div class="relative w-[90vw] max-w-md aspect-square canvas-container squircle border-4 border-white mb-6 p-2 z-10 flex items-center justify-center overflow-hidden">
+    <div class="relative w-[90vw] max-w-md aspect-square canvas-container squircle border-4 border-white mb-2 p-2 z-10 flex items-center justify-center overflow-hidden">
         <canvas id="render-canvas" class="w-full h-full rounded-2xl"></canvas>
         
         <video id="webcam" class="hide" autoplay playsinline></video>
@@ -116,10 +116,19 @@
         </button>
     </div>
 
-    <div class="w-full max-w-md bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] p-6 z-20 flex flex-col gap-6 mt-4 shrink-0">
+    <div class="w-[90vw] max-w-md flex justify-center gap-3 mb-4 z-20">
+        <button id="btn-recenter" class="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl transition active:scale-95 shadow-sm border border-slate-200">Recenter</button>
+        <button id="btn-toggle-pip" class="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl transition active:scale-95 shadow-sm border border-slate-200">Show Live Feed</button>
+    </div>
+
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] p-6 z-20 flex flex-col gap-6 mt-0 shrink-0">
         <div>
             <h3 class="text-xs font-bold text-slate-400 tracking-wider mb-3">CHARACTER STUDIO</h3>
-            <div class="grid grid-cols-4 gap-2">
+            <div class="grid grid-cols-2 gap-2 mb-3" role="tablist" aria-label="Character type">
+                <button id="btn-character-mode-2d" type="button" role="tab" aria-selected="true" aria-controls="character-list-2d" class="bg-indigo-500 text-white rounded-xl py-2 text-xs font-bold shadow-sm transition active:scale-95">2D CHARACTERS</button>
+                <button id="btn-character-mode-3d" type="button" role="tab" aria-selected="false" aria-controls="character-list-3d" class="bg-slate-100 text-slate-500 rounded-xl py-2 text-xs font-bold transition active:scale-95">3D MODELS</button>
+            </div>
+            <div id="character-list-2d" role="tabpanel" aria-labelledby="btn-character-mode-2d" class="grid grid-cols-4 gap-2">
                 <button id="btn-bear" class="bg-blue-100 text-blue-600 rounded-2xl p-2.5 flex flex-col items-center border-2 border-blue-200 shadow-sm transition active:scale-95">
                     <span class="text-xl mb-1">🐻</span>
                     <span class="text-[10px] font-bold">BEAR</span>
@@ -144,7 +153,15 @@
                     <span class="text-xl mb-1">🐧</span>
                     <span class="text-[10px] font-bold">PENGUIN</span>
                 </button>
-                <button id="btn-custom-trigger" class="col-span-2 bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100">
+            </div>
+            <div id="character-list-3d" role="tabpanel" aria-labelledby="btn-character-mode-3d" class="hidden grid grid-cols-4 gap-2">
+                <button id="btn-cowboy" type="button" class="bg-slate-100 text-slate-500 rounded-2xl p-2.5 flex flex-col items-center border-2 border-transparent transition active:scale-95">
+                    <span class="text-xl mb-1">🤠</span>
+                    <span class="text-[10px] font-bold">3D COWBOY</span>
+                </button>
+            </div>
+            <div class="mt-2">
+                <button id="btn-custom-trigger" class="w-full bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100">
                     <span class="text-xl">🖼</span>
                     <span class="text-xs font-bold tracking-wide">ADD CUSTOM / 3D</span>
                 </button>
@@ -164,10 +181,6 @@
         <div>
             <div class="flex justify-between items-center mb-3">
                 <h3 class="text-xs font-bold text-slate-400 tracking-wider">ADJUSTMENTS</h3>
-                <div class="flex gap-2">
-                    <button id="btn-recenter" class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm border border-slate-200">Recenter</button>
-                    <button id="btn-toggle-pip" class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm border border-slate-200">Show Live Feed</button>
-                </div>
             </div>
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
                 <div class="flex items-center gap-4">
@@ -365,7 +378,7 @@
         let isCameraActive = false;
         let selectedCharacter = 'bear'; 
         let selectedVariant = 0;
-        const savedVariants = { bear: 0, cat: 0, moose: 0, dog: 0, bird: 0, penguin: 0, custom: 0 };
+        const savedVariants = { bear: 0, cat: 0, moose: 0, dog: 0, bird: 0, penguin: 0, cowboy: 0, custom: 0 };
         let lastVideoTime = -1;
         let trackingResults = null;
         
@@ -733,7 +746,7 @@
                 drawPIPVisualizer(landmarks);
             } else { drawPIPVisualizer(null); }
 
-            if (selectedCharacter === 'custom' && customSettings.is3D && model3DRenderer) {
+            if ((selectedCharacter === 'custom' || selectedCharacter === 'cowboy') && customSettings.is3D && model3DRenderer) {
                 const activeCx = isCustomStatic ? screenCenterX : cx;
                 const activeCy = isCustomStatic ? screenCenterY : cy;
                 update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy);
@@ -831,7 +844,7 @@
             const lEyePos = getRotatedPos(lEyeTargetX, lEyeTargetY, false, true);
             const mouthPos = getRotatedPos(mTargetX, mTargetY, true, false); 
 
-            if (selectedCharacter !== 'custom') {
+            if (selectedCharacter !== 'custom' && selectedCharacter !== 'cowboy') {
                 ctx.save();
                 ctx.translate(cx, cy);
                 ctx.rotate(angle);
@@ -864,7 +877,7 @@
                 drawAlignedCutout(landmarks, MOUTH_CONTOUR, mouthPos.x, mouthPos.y, finalMouthScale, mouthDrawAngle, skinColor, null, 1.0);
             }
             
-            if (selectedCharacter !== 'custom' && selectedCharacter !== 'bird' && selectedCharacter !== 'penguin') {
+            if (selectedCharacter !== 'custom' && selectedCharacter !== 'cowboy' && selectedCharacter !== 'bird' && selectedCharacter !== 'penguin') {
                 ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle); ctx.translate(-cx, -cy);
                 ctx.fillStyle = '#000';
                 if (selectedCharacter === 'cat') {
@@ -902,7 +915,7 @@
             model3DScene.add(dirLight);
         }
 
-        function loadProceduralTest3DModel() {
+        function loadProceduralTest3DModel(openStudio = true) {
             init3DCanvasRenderer();
             reset3DFeatureOffsets();
             while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
@@ -947,26 +960,29 @@
             if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
 
             customSettings.is3D = true; customSettings.isStatic = false;
-            document.getElementById('custom-status').style.display = 'none';
-            document.getElementById('custom-controls').classList.add('hidden'); document.getElementById('custom-controls').classList.remove('flex');
-            document.getElementById('panel-3d-adjust').classList.remove('hidden'); document.getElementById('panel-3d-adjust').classList.add('flex');
-            btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
-            guides.forEach(g => g.classList.add('hidden'));
-
-            isPreviewing3D = true; render3DStudioPreview();
+            if (openStudio) {
+                document.getElementById('custom-status').style.display = 'none';
+                document.getElementById('custom-controls').classList.add('hidden'); document.getElementById('custom-controls').classList.remove('flex');
+                document.getElementById('panel-3d-adjust').classList.remove('hidden'); document.getElementById('panel-3d-adjust').classList.add('flex');
+                btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
+                guides.forEach(g => g.classList.add('hidden'));
+            }
+            isPreviewing3D = openStudio;
+            if (openStudio) render3DStudioPreview();
+            else if (!isCameraActive) drawScene();
         }
 
-        function loadTest3DModel() {
+        function loadTest3DModel(openStudio = true) {
             init3DCanvasRenderer();
             const loader = new GLTFLoader();
             loader.load(new URL('character.glb', document.baseURI).href, (gltf) => {
-                initializeLoaded3DModel(gltf);
+                initializeLoaded3DModel(gltf, openStudio);
             }, undefined, () => {
-                loadProceduralTest3DModel();
+                loadProceduralTest3DModel(openStudio);
             });
         }
 
-        function initializeLoaded3DModel(gltf) {
+        function initializeLoaded3DModel(gltf, openStudio = true) {
             reset3DFeatureOffsets();
             while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
             model3DScene.add(gltf.scene);
@@ -1008,13 +1024,16 @@
             if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
 
             customSettings.is3D = true; customSettings.isStatic = false;
-            document.getElementById('custom-status').style.display = 'none';
-            document.getElementById('custom-controls').classList.add('hidden'); document.getElementById('custom-controls').classList.remove('flex');
-            document.getElementById('panel-3d-adjust').classList.remove('hidden'); document.getElementById('panel-3d-adjust').classList.add('flex');
-            btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
-            guides.forEach(g => g.classList.add('hidden'));
-
-            isPreviewing3D = true; render3DStudioPreview();
+            if (openStudio) {
+                document.getElementById('custom-status').style.display = 'none';
+                document.getElementById('custom-controls').classList.add('hidden'); document.getElementById('custom-controls').classList.remove('flex');
+                document.getElementById('panel-3d-adjust').classList.remove('hidden'); document.getElementById('panel-3d-adjust').classList.add('flex');
+                btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
+                guides.forEach(g => g.classList.add('hidden'));
+            }
+            isPreviewing3D = openStudio;
+            if (openStudio) render3DStudioPreview();
+            else if (!isCameraActive) drawScene();
         }
 
         function load3DModelFile(file) {
@@ -1267,14 +1286,36 @@
         const btnDog = document.getElementById('btn-dog');
         const btnBird = document.getElementById('btn-bird');
         const btnPenguin = document.getElementById('btn-penguin');
+        const btnCowboy = document.getElementById('btn-cowboy');
+        const btnCharacterMode2D = document.getElementById('btn-character-mode-2d');
+        const btnCharacterMode3D = document.getElementById('btn-character-mode-3d');
+        const characterList2D = document.getElementById('character-list-2d');
+        const characterList3D = document.getElementById('character-list-3d');
         const btnCustomTrig = document.getElementById('btn-custom-trigger');
         const btnLoadTest3D = document.getElementById('btn-load-test-3d');
         const selectVariant = document.getElementById('select-variant');
 
+        function setCharacterMode(mode) {
+            const is3DMode = mode === '3d';
+            characterList2D.classList.toggle('hidden', is3DMode);
+            characterList3D.classList.toggle('hidden', !is3DMode);
+            btnCharacterMode2D.setAttribute('aria-selected', String(!is3DMode));
+            btnCharacterMode3D.setAttribute('aria-selected', String(is3DMode));
+            btnCharacterMode2D.className = is3DMode
+                ? 'bg-slate-100 text-slate-500 rounded-xl py-2 text-xs font-bold transition active:scale-95'
+                : 'bg-indigo-500 text-white rounded-xl py-2 text-xs font-bold shadow-sm transition active:scale-95';
+            btnCharacterMode3D.className = is3DMode
+                ? 'bg-indigo-500 text-white rounded-xl py-2 text-xs font-bold shadow-sm transition active:scale-95'
+                : 'bg-slate-100 text-slate-500 rounded-xl py-2 text-xs font-bold transition active:scale-95';
+        }
+
+        btnCharacterMode2D.addEventListener('click', () => setCharacterMode('2d'));
+        btnCharacterMode3D.addEventListener('click', () => setCharacterMode('3d'));
+
         function updateCharacterSelection(activeChar) {
             selectedCharacter = activeChar;
-            [btnBear, btnCat, btnMoose, btnDog, btnBird, btnPenguin, btnCustomTrig].forEach(btn => {
-                if (btn.id === 'btn-custom-trigger') btn.className = 'col-span-2 bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100';
+            [btnBear, btnCat, btnMoose, btnDog, btnBird, btnPenguin, btnCowboy, btnCustomTrig].forEach(btn => {
+                if (btn.id === 'btn-custom-trigger') btn.className = 'w-full bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100';
                 else btn.className = 'bg-slate-100 text-slate-500 rounded-2xl p-2.5 flex flex-col items-center border-2 border-transparent transition active:scale-95';
             });
             const characterButtons = { bear: btnBear, cat: btnCat, moose: btnMoose, dog: btnDog, bird: btnBird, penguin: btnPenguin };
@@ -1287,9 +1328,10 @@
                 penguin: 'bg-slate-200 text-slate-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-slate-400 shadow-sm transition active:scale-95'
             };
             if (characterButtons[activeChar]) characterButtons[activeChar].className = activeClasses[activeChar];
-            if (activeChar === 'custom') btnCustomTrig.className = 'col-span-2 bg-indigo-500 text-white rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-indigo-600 shadow-md transition active:scale-95';
+            if (activeChar === 'cowboy') btnCowboy.className = 'bg-amber-100 text-amber-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-amber-300 shadow-sm transition active:scale-95';
+            if (activeChar === 'custom') btnCustomTrig.className = 'w-full bg-indigo-500 text-white rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-indigo-600 shadow-md transition active:scale-95';
             
-            selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom');
+            selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom' || activeChar === 'cowboy');
             if(!isCameraActive) drawScene();
         }
 
@@ -1297,6 +1339,10 @@
         Object.entries(characterButtons).forEach(([character, button]) => {
             button.onclick = () => updateCharacterSelection(character);
         });
+        btnCowboy.onclick = () => {
+            updateCharacterSelection('cowboy');
+            loadTest3DModel(false);
+        };
         btnLoadTest3D.onclick = () => loadTest3DModel();
 
         selectVariant.addEventListener('change', (e) => { selectedVariant = parseInt(e.target.value); savedVariants[selectedCharacter] = selectedVariant; if(!isCameraActive) drawScene(); });
