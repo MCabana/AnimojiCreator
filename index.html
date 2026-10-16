@@ -764,14 +764,7 @@
                 if (livePlanes.mouth) {
                     updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, false, angle);
                     livePlanes.mouth.texture.needsUpdate = true; 
-                    
-                    let mouthOpenScale = 1.0;
-                    if (landmarks) {
-                        const topLip = landmarks[13];
-                        const botLip = landmarks[14] || landmarks[17];
-                        mouthOpenScale = 1.0 + (Math.abs(topLip.y - botLip.y) * 4.0);
-                    }
-                    livePlanes.mouth.mesh.scale.set(mouthScale * 1.3, mouthScale * 1.3 * mouthOpenScale, mouthScale * 1.3);
+                    livePlanes.mouth.mesh.scale.setScalar(mouthScale * 1.3);
                 }
 
                 model3DRenderer.render(model3DScene, model3DCamera);
