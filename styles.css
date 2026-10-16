@@ -1,0 +1,67 @@
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background: linear-gradient(180deg, #dbeafe 0%, #dbeafe 30%, #ffffff 30%, #ffffff 100%);
+            overscroll-behavior: none;
+        }
+        .canvas-container {
+            box-shadow: 0 20px 40px -15px rgba(0,0,0,0.1);
+            background-color: #fdf2cb;
+        }
+        .bubbly-text {
+            text-shadow: 2px 2px 0px #fff, -2px -2px 0px #fff, 2px -2px 0px #fff, -2px 2px 0px #fff;
+        }
+        .squircle {
+            border-radius: 24px;
+        }
+        .hide {
+            display: none !important;
+        }
+        .pill-left {
+            position: absolute;
+            left: -20px;
+            top: 150px;
+            width: 60px;
+            height: 120px;
+            background-color: #a7f3d0;
+            border-radius: 60px;
+            z-index: -1;
+        }
+        .pill-right {
+            position: absolute;
+            right: -20px;
+            top: 100px;
+            width: 80px;
+            height: 160px;
+            background-color: #fed7aa;
+            border-radius: 60px;
+            z-index: -1;
+        }
+        .guide-dot {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            border: 2px solid white;
+        }
+        .faux-fullscreen {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            aspect-ratio: auto !important;
+            border-radius: 0 !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 9999 !important;
+            background-color: #fdf2cb !important;
+        }
+        .canvas-container.faux-fullscreen + .preview-controls {
+            position: fixed;
+            left: 50%;
+            bottom: max(1rem, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            width: min(90vw, 28rem);
+            margin-bottom: 0;
+            z-index: 10000;
+        }
