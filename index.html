@@ -75,6 +75,15 @@
             z-index: 9999 !important;
             background-color: #fdf2cb !important;
         }
+        .canvas-container.faux-fullscreen + .preview-controls {
+            position: fixed;
+            left: 50%;
+            bottom: max(1rem, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            width: min(90vw, 28rem);
+            margin-bottom: 0;
+            z-index: 10000;
+        }
     </style>
 </head>
 <body class="min-h-[100dvh] w-screen overflow-x-hidden flex flex-col items-center pt-8 relative pb-10">
@@ -116,7 +125,7 @@
         </button>
     </div>
 
-    <div class="w-[90vw] max-w-md flex justify-center gap-3 mb-4 z-20">
+    <div class="preview-controls w-[90vw] max-w-md flex justify-center gap-3 mb-4 z-20">
         <button id="btn-recenter" class="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl transition active:scale-95 shadow-sm border border-slate-200">Recenter</button>
         <button id="btn-toggle-pip" class="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl transition active:scale-95 shadow-sm border border-slate-200">Show Live Feed</button>
     </div>
