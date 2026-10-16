@@ -482,7 +482,7 @@
             plane.mesh.geometry.computeVertexNormals();
         }
 
-        function updateTextureCanvas(canvas, landmarks, indices, flipFor3D = false, rollAngle = 0) {
+        function updateTextureCanvas(canvas, landmarks, indices, flipFor3D = false, rollAngle = 0, fitToWidth = false, anchorPoint = null) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (!landmarks || indices.length === 0) return;
@@ -499,14 +499,16 @@
                 if(pt.y > maxY) maxY = pt.y;
             });
             
-            let anchorX = (minX + maxX) / 2;
-            let anchorY = (minY + maxY) / 2;
+            let anchorX = anchorPoint ? anchorPoint.x : (minX + maxX) / 2;
+            let anchorY = anchorPoint ? anchorPoint.y : (minY + maxY) / 2;
             
             const featureW = (maxX - minX) * vw;
             const featureH = (maxY - minY) * vh;
             
             // Reduce scale slightly to 0.55 to leave padding on the canvas for the feathered mask
-            const scale = Math.min(canvas.width / featureW, canvas.height / featureH) * 0.55; 
+            const scale = (fitToWidth
+                ? canvas.width / featureW
+                : Math.min(canvas.width / featureW, canvas.height / featureH)) * 0.55;
             
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -515,15 +517,19 @@
             
             // 1. Draw the face boundary, expanded and heavily blurred to feather the edges
             ctx.save();
-            ctx.scale(1.4, 1.4); // Expand the masked area by 40% to show more surrounding skin
+            ctx.scale(1.4, 1.4);
             ctx.beginPath();
-            indices.forEach((idx, i) => {
-                const pt = landmarks[idx];
-                const dx = ((1.0 - pt.x) - (1.0 - anchorX)) * vw * scale;
-                const dy = (pt.y - anchorY) * vh * scale;
-                if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
-            });
-            ctx.closePath();
+            if (fitToWidth) {
+                ctx.ellipse(0, 0, canvas.width * 0.27, canvas.height * 0.18, 0, 0, Math.PI * 2);
+            } else {
+                indices.forEach((idx, i) => {
+                    const pt = landmarks[idx];
+                    const dx = ((1.0 - pt.x) - (1.0 - anchorX)) * vw * scale;
+                    const dy = (pt.y - anchorY) * vh * scale;
+                    if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
+                });
+                ctx.closePath();
+            }
             
             ctx.fillStyle = '#ffffff';
             ctx.filter = 'blur(12px)'; // Apply heavy feathering to the mask edges
@@ -762,7 +768,12 @@
                     livePlanes.eye_right.mesh.scale.setScalar(eyeScale * 1.3);
                 }
                 if (livePlanes.mouth) {
-                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, false, angle);
+                    const mouthCorners = landmarks && [landmarks[61], landmarks[291]];
+                    const mouthAnchor = mouthCorners && {
+                        x: (mouthCorners[0].x + mouthCorners[1].x) / 2,
+                        y: (mouthCorners[0].y + mouthCorners[1].y) / 2
+                    };
+                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, false, angle, true, mouthAnchor);
                     livePlanes.mouth.texture.needsUpdate = true; 
                     livePlanes.mouth.mesh.scale.setScalar(mouthScale * 1.3);
                 }
