@@ -7,9 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
     
-    <!-- Three.js for 3D model parsing and procedural test avatar support -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+            }
+        }
+    </script>
 
     <style>
         body {
@@ -325,6 +330,9 @@
     </div>
 
     <script type="module">
+        import * as THREE from "three";
+        import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+        import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         const originalConsoleError = console.error;
         console.error = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('Created TensorFlow Lite XNNPACK delegate')) {
@@ -387,6 +395,7 @@
         let model3DRenderer = null;
         let model3DScene = null;
         let model3DCamera = null;
+        let model3DEnvironment = null;
         let modelBones = {};
         let isPreviewing3D = false;
         
@@ -737,7 +746,7 @@
             ctx.rotate(isCustomStatic ? 0 : angle);
             ctx.translate(isCustomStatic ? -screenCenterX : -cx, isCustomStatic ? -screenCenterY : -cy);
             
-            if (selectedCharacter === 'bear') drawBearBase(cx, cy, headRadius, yawX, pitchY);
+            if (selectedCharacter !== 'custom') drawCharacterBase(cx, cy, headRadius, yawX, pitchY);
             else if (selectedCharacter === 'custom' && customImageMasked) {
                 if (isCustomStatic) ctx.drawImage(customImageMasked, screenCenterX - customBgDrawW/2, screenCenterY - customBgDrawH/2, customBgDrawW, customBgDrawH);
                 else {
@@ -820,6 +829,17 @@
             model3DScene = new THREE.Scene();
             model3DCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
             model3DCamera.position.set(0, 0, 4.0);
+            const pmremGenerator = new THREE.PMREMGenerator(model3DRenderer);
+            pmremGenerator.compileEquirectangularShader();
+            const roomEnvironment = new RoomEnvironment();
+            try {
+                model3DEnvironment = pmremGenerator.fromScene(roomEnvironment);
+                model3DScene.environment = model3DEnvironment.texture;
+                model3DScene.environmentIntensity = 0.5; // lower brightness; 1 is the default
+            } finally {
+                roomEnvironment.dispose();
+                pmremGenerator.dispose();
+            }
             model3DScene.add(new THREE.AmbientLight(0xffffff, 1.2));
             const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(2, 4, 3);
             model3DScene.add(dirLight);
@@ -881,7 +901,7 @@
 
         function loadTest3DModel() {
             init3DCanvasRenderer();
-            const loader = new THREE.GLTFLoader();
+            const loader = new GLTFLoader();
             loader.load(new URL('character.glb', document.baseURI).href, (gltf) => {
                 initializeLoaded3DModel(gltf);
             }, undefined, () => {
@@ -944,7 +964,7 @@
             init3DCanvasRenderer();
             const reader = new FileReader();
             reader.onload = (e) => {
-                const loader = new THREE.GLTFLoader();
+                const loader = new GLTFLoader();
                 loader.parse(e.target.result, '', (gltf) => {
                     initializeLoaded3DModel(gltf);
                 }, undefined, (error) => { alert('Could not parse GLB/GLTF model.'); });
@@ -1069,21 +1089,72 @@
             drawContour(LEFT_EYE_CONTOUR, '#06b6d4'); drawContour(RIGHT_EYE_CONTOUR, '#06b6d4'); drawContour(MOUTH_CONTOUR, '#ec4899');
         }
 
-        function drawBearBase(cx, cy, r, yaw, pitch) {
-            const colors = PALETTES['bear'][selectedVariant] || PALETTES['bear'][0];
+        function drawCharacterBase(cx, cy, r, yaw, pitch) {
+            const character = PALETTES[selectedCharacter] ? selectedCharacter : 'bear';
+            const colors = PALETTES[character][selectedVariant] || PALETTES[character][0];
             const hx = cx + yaw * 0.2; const hy = cy + pitch * 0.2;
             const ex = cx - yaw * 0.3; const ey = cy - pitch * 0.3;
             const px = cx + yaw * 0.1; const py = cy + pitch * 0.1;
             const gradT = ctx.createRadialGradient(hx, hy+r*1.5, 0, hx, hy+r*1.5, r);
             gradT.addColorStop(0, colors.bodyTop); gradT.addColorStop(1, colors.bodyBottom);
             ctx.fillStyle = gradT; ctx.beginPath(); ctx.roundRect(hx - r*0.8, hy + r*0.5, r*1.6, r, r*0.5); ctx.fill();
-            ctx.fillStyle = colors.base;
-            ctx.beginPath(); ctx.arc(ex - r*0.7, ey - r*0.7, r*0.3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(ex + r*0.7, ey - r*0.7, r*0.3, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = colors.extra;
-            ctx.beginPath(); ctx.arc(ex - r*0.7, ey - r*0.7, r*0.15, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(ex + r*0.7, ey - r*0.7, r*0.15, 0, Math.PI*2); ctx.fill();
+
+            if (character === 'penguin') {
+                ctx.fillStyle = colors.extra;
+                ctx.beginPath(); ctx.ellipse(px, py + r * 0.98, r * 0.53, r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+            } else if (character === 'bird') {
+                ctx.fillStyle = colors.extra;
+                ctx.beginPath(); ctx.ellipse(px - r * 0.63, py + r * 0.83, r * 0.28, r * 0.48, -0.35, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(px + r * 0.63, py + r * 0.83, r * 0.28, r * 0.48, 0.35, 0, Math.PI * 2); ctx.fill();
+            } else if (character === 'moose') {
+                ctx.strokeStyle = colors.extra; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round';
+                [-1, 1].forEach(side => {
+                    ctx.beginPath(); ctx.moveTo(ex + side * r * 0.48, ey - r * 0.56);
+                    ctx.lineTo(ex + side * r * 0.68, ey - r * 1.15);
+                    ctx.lineTo(ex + side * r * 0.92, ey - r * 1.3);
+                    ctx.moveTo(ex + side * r * 0.68, ey - r * 1.15);
+                    ctx.lineTo(ex + side * r * 0.54, ey - r * 1.43);
+                    ctx.moveTo(ex + side * r * 0.77, ey - r * 1.24);
+                    ctx.lineTo(ex + side * r * 1.03, ey - r * 1.08);
+                    ctx.stroke();
+                });
+                ctx.fillStyle = colors.base;
+                ctx.beginPath(); ctx.ellipse(ex - r * 0.7, ey - r * 0.45, r * 0.2, r * 0.35, -0.3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(ex + r * 0.7, ey - r * 0.45, r * 0.2, r * 0.35, 0.3, 0, Math.PI * 2); ctx.fill();
+            } else if (character === 'cat') {
+                ctx.fillStyle = colors.base;
+                [-1, 1].forEach(side => {
+                    ctx.beginPath(); ctx.moveTo(ex + side * r * 0.38, ey - r * 0.55); ctx.lineTo(ex + side * r * 0.88, ey - r * 1.35); ctx.lineTo(ex + side * r * 0.98, ey - r * 0.2); ctx.closePath(); ctx.fill();
+                });
+                ctx.fillStyle = colors.extra;
+                [-1, 1].forEach(side => {
+                    ctx.beginPath(); ctx.moveTo(ex + side * r * 0.55, ey - r * 0.52); ctx.lineTo(ex + side * r * 0.83, ey - r * 1.05); ctx.lineTo(ex + side * r * 0.88, ey - r * 0.3); ctx.closePath(); ctx.fill();
+                });
+            } else {
+                ctx.fillStyle = colors.base;
+                if (character === 'dog') {
+                    [-1, 1].forEach(side => {
+                        ctx.beginPath(); ctx.ellipse(ex + side * r * 0.78, ey - r * 0.3, r * 0.28, r * 0.52, side * -0.35, 0, Math.PI * 2); ctx.fill();
+                    });
+                } else {
+                    ctx.beginPath(); ctx.arc(ex - r*0.7, ey - r*0.7, r*0.3, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(ex + r*0.7, ey - r*0.7, r*0.3, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = colors.extra;
+                    ctx.beginPath(); ctx.arc(ex - r*0.7, ey - r*0.7, r*0.15, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(ex + r*0.7, ey - r*0.7, r*0.15, 0, Math.PI*2); ctx.fill();
+                }
+            }
+
             const grad = ctx.createRadialGradient(hx, hy-r*0.2, 0, hx, hy, r);
             grad.addColorStop(0, colors.headLight); grad.addColorStop(1, colors.base);
             ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(hx, hy, r, 0, Math.PI*2); ctx.fill();
+            if (character === 'bird' || character === 'penguin') {
+                ctx.fillStyle = colors.snout;
+                const beakHalfWidth = r * (character === 'bird' ? 0.2 : 0.16);
+                const beakTop = r * (character === 'bird' ? 0.18 : 0.12);
+                const beakBottom = r * (character === 'bird' ? 0.48 : 0.38);
+                ctx.beginPath(); ctx.moveTo(hx - beakHalfWidth, hy + beakTop); ctx.lineTo(hx + beakHalfWidth, hy + beakTop); ctx.lineTo(hx, hy + beakBottom); ctx.closePath(); ctx.fill();
+            }
             ctx.fillStyle = colors.bodyBottom;
             ctx.beginPath(); ctx.arc(px - r*0.6, py + r*1.2, r*0.25, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(px + r*0.6, py + r*1.2, r*0.25, 0, Math.PI*2); ctx.fill();
         }
@@ -1104,14 +1175,18 @@
                 if (btn.id === 'btn-custom-trigger') btn.className = 'col-span-2 bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100';
                 else btn.className = 'bg-slate-100 text-slate-500 rounded-2xl p-2.5 flex flex-col items-center border-2 border-transparent transition active:scale-95';
             });
-            if (activeChar === 'bear') btnBear.className = 'bg-blue-100 text-blue-600 rounded-2xl p-2.5 flex flex-col items-center border-2 border-blue-200 shadow-sm transition active:scale-95';
+            const characterButtons = { bear: btnBear, cat: btnCat, moose: btnMoose, dog: btnDog, bird: btnBird, penguin: btnPenguin };
+            if (characterButtons[activeChar]) characterButtons[activeChar].className = 'bg-blue-100 text-blue-600 rounded-2xl p-2.5 flex flex-col items-center border-2 border-blue-200 shadow-sm transition active:scale-95';
             if (activeChar === 'custom') btnCustomTrig.className = 'col-span-2 bg-indigo-500 text-white rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-indigo-600 shadow-md transition active:scale-95';
             
             selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom');
             if(!isCameraActive) drawScene();
         }
 
-        btnBear.onclick = () => updateCharacterSelection('bear');
+        const characterButtons = { bear: btnBear, cat: btnCat, moose: btnMoose, dog: btnDog, bird: btnBird, penguin: btnPenguin };
+        Object.entries(characterButtons).forEach(([character, button]) => {
+            button.onclick = () => updateCharacterSelection(character);
+        });
         btnLoadTest3D.onclick = () => loadTest3DModel();
 
         selectVariant.addEventListener('change', (e) => { selectedVariant = parseInt(e.target.value); savedVariants[selectedCharacter] = selectedVariant; if(!isCameraActive) drawScene(); });
