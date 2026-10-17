@@ -135,13 +135,12 @@
 
             const tex = new THREE.CanvasTexture(cvs);
             tex.colorSpace = THREE.SRGBColorSpace;
-            const mat = new THREE.MeshStandardMaterial({
+            const mat = new THREE.MeshLambertMaterial({
                 map: tex,
                 transparent: true,
                 side: THREE.DoubleSide,
                 depthWrite: false,
-                roughness: 1,
-                metalness: 0
+                alphaTest: 0.01
             });
             
             const geo = new THREE.PlaneGeometry(0.5, 0.5, 16, 16);
@@ -556,9 +555,9 @@
                 roomEnvironment.dispose();
                 pmremGenerator.dispose();
             }
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            const ambientLight = new THREE.AmbientLight(0xfffaf5, 0.8);
             model3DScene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            const directionalLight = new THREE.DirectionalLight(0xfffaf5, 0.5);
             directionalLight.position.set(2, 4, 3);
             model3DScene.add(directionalLight);
             previewBackgroundManager.setLights(ambientLight, directionalLight);

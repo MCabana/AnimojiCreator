@@ -20,6 +20,7 @@ export function createPreviewBackground({
     let ambientLight = null;
     let directionalLight = null;
 
+    const neutralLightColor = new THREE.Color(0xfffaf5);
     const sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = 16;
     sampleCanvas.height = 16;
@@ -32,8 +33,8 @@ export function createPreviewBackground({
     }
 
     function resetLightingTint() {
-        ambientLight?.color.set(0xffffff);
-        directionalLight?.color.set(0xffffff);
+        ambientLight?.color.copy(neutralLightColor);
+        directionalLight?.color.copy(neutralLightColor);
     }
 
     function updateLighting(source) {
@@ -77,9 +78,8 @@ export function createPreviewBackground({
             return;
         }
 
-        const white = new THREE.Color(0xffffff);
-        ambientLight.color.copy(white).lerp(averageColor, 0.6);
-        directionalLight.color.copy(white).lerp(averageColor, 0.45);
+        ambientLight.color.copy(neutralLightColor).lerp(averageColor, 0.3);
+        directionalLight.color.copy(neutralLightColor).lerp(averageColor, 0.2);
     }
 
     function releaseMedia() {
