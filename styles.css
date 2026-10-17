@@ -197,6 +197,52 @@
                 padding: 10px;
             }
         }
+        @media (orientation: landscape) and (max-height: 600px) {
+            .app-shell {
+                gap: 4px;
+                padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+            }
+            .app-header h1 {
+                font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+            }
+            .app-header > div {
+                padding: 4px 9px;
+                font-size: 0.7rem;
+            }
+            .app-workspace {
+                grid-template-columns: minmax(0, 1fr) minmax(250px, 36vw);
+                grid-template-rows: minmax(0, 1fr);
+                gap: 10px;
+            }
+            .preview-column {
+                grid-template-rows: minmax(0, 1fr) auto;
+                gap: 4px;
+            }
+            .canvas-container {
+                width: min(100%, calc(100dvh - 98px)) !important;
+                height: auto !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                padding: 4px;
+            }
+            .preview-controls {
+                gap: 6px;
+            }
+            .preview-controls button {
+                padding: 5px 10px;
+            }
+            .studio-panel {
+                padding: 10px;
+                gap: 8px;
+                border-radius: 18px;
+            }
+            .studio-panel > div {
+                flex-shrink: 0;
+            }
+            .studio-panel h3 {
+                margin-bottom: 5px;
+            }
+        }
         .canvas-container.faux-fullscreen {
             width: 100vw !important;
             height: 100dvh !important;

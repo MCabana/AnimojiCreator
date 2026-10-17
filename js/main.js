@@ -295,7 +295,19 @@
             }
             drawScene();
         }
-        window.addEventListener('resize', resizeCanvases);
+        let resizeFrame = 0;
+        function scheduleCanvasResize() {
+            if (resizeFrame) cancelAnimationFrame(resizeFrame);
+            resizeFrame = requestAnimationFrame(() => {
+                resizeFrame = 0;
+                resizeCanvases();
+            });
+        }
+        window.addEventListener('resize', scheduleCanvasResize);
+        window.addEventListener('orientationchange', scheduleCanvasResize);
+        window.visualViewport?.addEventListener('resize', scheduleCanvasResize);
+        const canvasResizeObserver = new ResizeObserver(scheduleCanvasResize);
+        canvasResizeObserver.observe(document.querySelector('.canvas-container'));
 
         function drawScene() {
             if (canvas.width === 0 || (camera.isActive && video.videoWidth === 0)) return;
