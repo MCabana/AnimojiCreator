@@ -197,3 +197,10 @@
                 padding: 10px;
             }
         }
+        .canvas-container.faux-fullscreen {
+            width: 100vw !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            max-height: none !important;
+            aspect-ratio: auto !important;
+        }
