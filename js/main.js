@@ -54,6 +54,7 @@
         let offsetRoll = 0;
         let offsetYaw = 0;
         let offsetPitch = 0;
+        let neutralFaceAspectRatio = null;
         let requestRecenter = false;
 
         let customBaseImage = null; 
@@ -302,7 +303,7 @@
             customBgDrawH = headRadius * 2.5;
             
             let landmarks = null;
-            let angle = 0; let yawX = 0; let pitchY = 0; let globalScale = 1.0;
+            let angle = 0; let yawX = 0; let pitchY = 0; let pitchAxisScale = 1; let globalScale = 1.0;
             const vw = video.videoWidth || 640; const vh = video.videoHeight || 480;
             const isCustomStatic = (selectedCharacter === 'custom' && customSettings.isStatic);
 
@@ -331,9 +332,19 @@
                     
                     const localYaw = (nX * uX + nY * uY) / faceWidthRatio; 
                     const rawPitch = (nX * vX + nY * vY) / faceWidthRatio;
+                    const forehead = landmarks[10];
+                    const chin = landmarks[152];
+                    const faceHeightRatio = forehead && chin
+                        ? Math.hypot((forehead.x - chin.x) * vw, (forehead.y - chin.y) * vh) / vh
+                        : 0;
+                    const faceAspectRatio = faceHeightRatio > 0 ? faceWidthRatio / faceHeightRatio : 0;
+                    if (neutralFaceAspectRatio === null && faceAspectRatio > 0) {
+                        neutralFaceAspectRatio = faceAspectRatio;
+                    }
                     
                     if (requestRecenter) {
                         offsetRoll = rawAngle; offsetYaw = localYaw; offsetPitch = rawPitch - 0.30;
+                        if (faceAspectRatio > 0) neutralFaceAspectRatio = faceAspectRatio;
                         requestRecenter = false;
                         btnRecenter.textContent = "Centered!"; btnRecenter.classList.add('bg-emerald-100', 'text-emerald-600', 'border-emerald-200');
                         setTimeout(() => { btnRecenter.textContent = "Recenter"; btnRecenter.classList.remove('bg-emerald-100', 'text-emerald-600', 'border-emerald-200'); }, 1000);
@@ -344,6 +355,9 @@
                     
                     yawX = adjustedYaw * headRadius * 1.2;
                     pitchY = localPitch * headRadius * 1.2;
+                    if (neutralFaceAspectRatio && faceAspectRatio > 0) {
+                        pitchAxisScale = Math.max(0.6, Math.min(1, faceAspectRatio / neutralFaceAspectRatio));
+                    }
                 }
                 drawPIPVisualizer(landmarks);
             } else { drawPIPVisualizer(null); }
@@ -351,7 +365,7 @@
             if ((selectedCharacter === 'custom' || selectedCharacter === CORE_CHARACTER_ID) && customSettings.is3D && model3DRenderer) {
                 const activeCx = isCustomStatic ? screenCenterX : cx;
                 const activeCy = isCustomStatic ? screenCenterY : cy;
-                update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy);
+                update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy, pitchAxisScale);
                 
                 if (livePlanes.eye_left) {
                     updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, false, angle);
@@ -1048,10 +1062,10 @@
             reader.readAsArrayBuffer(file);
         }
 
-        function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy) {
+        function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScale) {
             if (!modelBones.head) return;
             
-            const targetYaw = yaw / 200; const targetPitch = pitch / 100; const targetRoll = roll;
+            const targetYaw = yaw / 200; const targetPitch = (pitch / 100) * pitchAxisScale; const targetRoll = roll;
             const now = performance.now();
             const smoothedYaw = smoothHeadRotation(headRotationFilters.yaw, targetYaw, now);
             const smoothedPitch = smoothHeadRotation(headRotationFilters.pitch, targetPitch, now);
