@@ -1,4 +1,4 @@
-import * as THREE from "three";
+const BABYLON = window.BABYLON;
 
 export function createPreviewBackground({
     canvas,
@@ -20,12 +20,12 @@ export function createPreviewBackground({
     let ambientLight = null;
     let directionalLight = null;
 
-    const neutralLightColor = new THREE.Color(0xfffaf5);
+    const neutralLightColor = BABYLON.Color3.FromHexString("#fffaf5");
     const sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = 16;
     sampleCanvas.height = 16;
     const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true });
-    const averageColor = new THREE.Color();
+    const averageColor = new BABYLON.Color3();
 
     function setStatus(message, isError = false) {
         status.textContent = message;
@@ -33,8 +33,8 @@ export function createPreviewBackground({
     }
 
     function resetLightingTint() {
-        ambientLight?.color.copy(neutralLightColor);
-        directionalLight?.color.copy(neutralLightColor);
+        ambientLight?.diffuse.copyFrom(neutralLightColor);
+        directionalLight?.diffuse.copyFrom(neutralLightColor);
     }
 
     function updateLighting(source) {
@@ -67,19 +67,14 @@ export function createPreviewBackground({
                 blue += data[index + 2];
             }
             const pixelCount = data.length / 4;
-            averageColor.setRGB(
-                red / pixelCount / 255,
-                green / pixelCount / 255,
-                blue / pixelCount / 255,
-                THREE.SRGBColorSpace
-            );
+            averageColor.copyFromFloats(red / pixelCount / 255, green / pixelCount / 255, blue / pixelCount / 255);
         } catch (error) {
             console.error("Could not sample the preview background for 3D lighting:", error);
             return;
         }
 
-        ambientLight.color.copy(neutralLightColor).lerp(averageColor, 0.3);
-        directionalLight.color.copy(neutralLightColor).lerp(averageColor, 0.2);
+        ambientLight.diffuse.copyFrom(neutralLightColor).lerpToRef(averageColor, 0.3, ambientLight.diffuse);
+        directionalLight.diffuse.copyFrom(neutralLightColor).lerpToRef(averageColor, 0.2, directionalLight.diffuse);
     }
 
     function releaseMedia() {

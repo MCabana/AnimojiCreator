@@ -1,6 +1,6 @@
 export function createAccessoryManager({
-    THREE,
-    GLTFLoader,
+    BABYLON,
+    getScene,
     getCharacter,
     getModelRoot,
     isCameraActive,
@@ -21,48 +21,13 @@ export function createAccessoryManager({
         status.className = `mt-2 min-h-4 text-[10px] ${isError ? 'text-rose-600' : 'text-slate-500'}`;
     }
 
-    function disposeModelResources(root) {
-        if (!root) return;
-        const geometries = new Set();
-        const materials = new Set();
-        const skeletons = new Set();
-        root.traverse((child) => {
-            if (!child.isMesh) return;
-            if (child.geometry) geometries.add(child.geometry);
-            for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
-                if (material) materials.add(material);
-            }
-            if (child.isSkinnedMesh && child.skeleton) skeletons.add(child.skeleton);
-        });
-        geometries.forEach(geometry => geometry.dispose());
-        materials.forEach(material => {
-            for (const value of Object.values(material)) {
-                if (value?.isTexture) value.dispose();
-            }
-            material.dispose();
-        });
-        skeletons.forEach(skeleton => skeleton.dispose());
+    function disposeModelResources(assetContainer) {
+        assetContainer?.dispose();
     }
 
     function disposeMountedAccessory(accessory) {
         if (!accessory) return;
-        const geometries = new Set();
-        const materials = new Set();
-        accessory.meshes.forEach(mesh => {
-            if (mesh.parent) mesh.parent.remove(mesh);
-            if (mesh.geometry) geometries.add(mesh.geometry);
-            for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-                if (material) materials.add(material);
-            }
-        });
-        geometries.forEach(geometry => geometry.dispose());
-        materials.forEach(material => {
-            for (const value of Object.values(material)) {
-                if (value?.isTexture) value.dispose();
-            }
-            material.dispose();
-        });
-        accessory.skeletons.forEach(skeleton => skeleton.dispose());
+        disposeModelResources(accessory.assetContainer);
     }
 
     function clearMountedAccessories() {
@@ -88,53 +53,46 @@ export function createAccessoryManager({
         if (rigReady && characterId === getCharacter()) applySelectedAccessories();
     }
 
-    function mountAccessory(accessory, gltf) {
+    function mountAccessory(accessory, assetContainer) {
         const modelRoot = getModelRoot();
         if (!modelRoot || !rigReady) {
             throw new Error("Load the 3D core character before adding accessories.");
         }
 
-        const accessoryRoot = gltf.scene;
-        accessoryRoot.updateMatrixWorld(true);
-        modelRoot.updateMatrixWorld(true);
-        const meshes = [];
-        accessoryRoot.traverse(child => {
-            if (child.isMesh) meshes.push(child);
-        });
+        const meshes = assetContainer.meshes;
         if (meshes.length === 0) throw new Error("The selected accessory contains no meshes.");
 
-        const remappings = meshes.filter(mesh => mesh.isSkinnedMesh).map(mesh => {
-            if (!mesh.skeleton) throw new Error(`Skinned mesh "${mesh.name}" has no skeleton.`);
-            const sourceSkeleton = mesh.skeleton;
-            const mappedBones = sourceSkeleton.bones.map(accessoryBone => {
-                const boneName = accessoryBone.name?.trim().toLowerCase();
+        assetContainer.skeletons.forEach(skeleton => {
+            skeleton.bones.forEach(bone => {
+                const boneName = bone.name?.trim().toLowerCase();
                 const mappedBone = boneName ? rigBonesByName.get(boneName) : null;
                 if (!mappedBone) {
                     throw new Error(boneName
-                        ? `Core rig is missing accessory bone "${accessoryBone.name}".`
+                        ? `Core rig is missing accessory bone "${bone.name}".`
                         : "The accessory skeleton contains an unnamed bone.");
                 }
-                return mappedBone;
+                bone.linkTransformNode(mappedBone);
             });
-            return {
-                mesh,
-                sourceSkeleton,
-                skeleton: new THREE.Skeleton(mappedBones, sourceSkeleton.boneInverses)
-            };
         });
 
-        const skeletons = [];
-        const sourceSkeletons = new Set();
-        remappings.forEach(({ mesh, sourceSkeleton, skeleton }) => {
-            mesh.bind(skeleton, mesh.bindMatrix);
-            mesh.frustumCulled = false;
-            skeletons.push(skeleton);
-            sourceSkeletons.add(sourceSkeleton);
+        assetContainer.addAllToScene();
+        assetContainer.rootNodes.forEach(rootNode => {
+            rootNode.parent = modelRoot;
         });
-        meshes.forEach(mesh => modelRoot.attach(mesh));
-        accessoryRoot.clear();
-        sourceSkeletons.forEach(skeleton => skeleton.dispose());
-        return { id: accessory.id, meshes, skeletons };
+        meshes.forEach(mesh => {
+            if (mesh instanceof BABYLON.AbstractMesh) mesh.alwaysSelectAsActiveMesh = true;
+        });
+        return { id: accessory.id, assetContainer };
+    }
+
+    function loadAssetContainer(modelUrl) {
+        const url = new URL(modelUrl, document.baseURI);
+        const pathSeparator = url.href.lastIndexOf('/') + 1;
+        return BABYLON.SceneLoader.LoadAssetContainerAsync(
+            url.href.slice(0, pathSeparator),
+            url.href.slice(pathSeparator),
+            getScene()
+        );
     }
 
     function changeAccessory(slot, accessoryId) {
@@ -166,28 +124,28 @@ export function createAccessoryManager({
             return;
         }
 
-        new GLTFLoader().load(new URL(accessory.model, document.baseURI).href, (gltf) => {
+        loadAssetContainer(accessory.model).then(assetContainer => {
             if (requestToken !== accessoryLoadTokens.get(slot)
                 || selectedAccessoryIds.get(slot) !== accessoryId
                 || getCharacter() !== loadedCharacterId
                 || !rigReady) {
-                disposeModelResources(gltf.scene);
+                disposeModelResources(assetContainer);
                 return;
             }
             try {
-                const mounted = mountAccessory(accessory, gltf);
+                const mounted = mountAccessory(accessory, assetContainer);
                 disposeMountedAccessory(mountedAccessories.get(slot));
                 mountedAccessories.set(slot, mounted);
                 setStatus("");
                 if (!isCameraActive()) drawScene();
             } catch (error) {
-                disposeModelResources(gltf.scene);
+                disposeModelResources(assetContainer);
                 console.error(`Could not attach accessory "${accessory.id}":`, error);
                 selectedAccessoryIds.delete(slot);
                 rebuildSelectors();
                 setStatus(`Could not attach accessory: ${error.message}`, true);
             }
-        }, undefined, (error) => {
+        }).catch(error => {
             if (requestToken !== accessoryLoadTokens.get(slot)) return;
             console.error(`Could not load accessory "${accessory.id}":`, error);
             selectedAccessoryIds.delete(slot);

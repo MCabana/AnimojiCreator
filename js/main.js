@@ -1,4 +1,3 @@
-        import * as THREE from "three";
         import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
         import { PALETTES, drawCharacterBase } from "./characters.js";
         import { setupCamera } from "./camera.js";
@@ -7,8 +6,8 @@
         import { createCustomCharacterEditor } from "./custom-character-editor.js";
         import { createPreviewBackground } from "./preview-background.js";
         import { createAccessoryManager } from "./accessory-manager.js";
-        import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-        import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+        const BABYLON = window.BABYLON;
 
         const originalConsoleError = console.error;
         console.error = function(...args) {
@@ -60,10 +59,13 @@
         let customBgDrawW = 256;
         let customBgDrawH = 256;
         let customStaticScaleMult = 1.0;
-        let model3DRenderer = null;
+        let model3DEngine = null;
+        let model3DRenderCanvas = null;
         let model3DScene = null;
         let model3DCamera = null;
-        let model3DEnvironment = null;
+        let model3DCameraBaseZ = 4.0;
+        let model3DCameraBaseY = 0.0;
+        let model3DAssetContainer = null;
         let modelBones = {};
         let isPreviewing3D = false;
         let rigBonesByName = new Map();
@@ -111,13 +113,15 @@
             return filter.value;
         }
 
+        function setTrackedRotation(node, yaw, pitch, roll) {
+            const offset = BABYLON.Quaternion.RotationYawPitchRoll(yaw, pitch, roll);
+            node.rotationQuaternion = node.initRotationQuaternion.multiply(offset);
+        }
+
         function clearLivePlanes() {
             Object.values(livePlanes).forEach(plane => {
-                if (plane.mesh && plane.mesh.parent) plane.mesh.parent.remove(plane.mesh);
-                if (plane.anchor && plane.anchor.parent) plane.anchor.parent.remove(plane.anchor);
-                if (plane.texture) plane.texture.dispose();
-                if (plane.mesh.material) plane.mesh.material.dispose();
-                if (plane.mesh.geometry) plane.mesh.geometry.dispose();
+                plane.mesh?.dispose(false, true);
+                plane.anchor?.dispose(true);
             });
             livePlanes = {};
         }
@@ -126,35 +130,50 @@
             const cvs = document.createElement('canvas');
             cvs.width = 256; cvs.height = 256;
             
-            const ctxC = cvs.getContext('2d');
-            ctxC.fillStyle = name === 'mouth' ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.8)';
-            ctxC.beginPath();
-            if (name === 'mouth') ctxC.ellipse(128, 128, 80, 40, 0, 0, Math.PI * 2);
-            else ctxC.ellipse(128, 128, 40, 60, 0, 0, Math.PI * 2);
-            ctxC.fill();
+            const tex = new BABYLON.DynamicTexture(`${name}-texture`, { width: cvs.width, height: cvs.height }, model3DScene, false);
+            tex.hasAlpha = true;
+            tex.getContext().clearRect(0, 0, cvs.width, cvs.height);
+            tex.update();
+            const mat = new BABYLON.StandardMaterial(`${name}-material`, model3DScene);
+            mat.diffuseTexture = tex;
+            mat.useAlphaFromDiffuseTexture = true;
+            mat.backFaceCulling = false;
+            mat.alpha = 1;
+            mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+            const mesh = new BABYLON.Mesh(`${name}-plane`, model3DScene);
+            const positions = [];
+            const indices = [];
+            const uvs = [];
+            const subdivisions = 16;
+            for (let y = 0; y <= subdivisions; y++) {
+                for (let x = 0; x <= subdivisions; x++) {
+                    positions.push((x / subdivisions - 0.5) * 0.5, (0.5 - y / subdivisions) * 0.5, 0);
+                    uvs.push(x / subdivisions, 1 - y / subdivisions);
+                    if (x < subdivisions && y < subdivisions) {
+                        const i = y * (subdivisions + 1) + x;
+                        indices.push(i, i + 1, i + subdivisions + 1, i + 1, i + subdivisions + 2, i + subdivisions + 1);
+                    }
+                }
+            }
+            const normals = [];
+            BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+            const vertexData = new BABYLON.VertexData();
+            vertexData.positions = positions;
+            vertexData.indices = indices;
+            vertexData.normals = normals;
+            vertexData.uvs = uvs;
+            vertexData.applyToMesh(mesh, true);
+            mesh.material = mat;
+            mesh.isPickable = false;
 
-            const tex = new THREE.CanvasTexture(cvs);
-            tex.colorSpace = THREE.SRGBColorSpace;
-            const mat = new THREE.MeshLambertMaterial({
-                map: tex,
-                transparent: true,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-                alphaTest: 0.01
-            });
-            
-            const geo = new THREE.PlaneGeometry(0.5, 0.5, 16, 16);
-
-            const mesh = new THREE.Mesh(geo, mat);
-
-            const anchor = new THREE.Group();
-            bone.updateWorldMatrix(true, false);
-            const worldQuat = new THREE.Quaternion();
-            bone.getWorldQuaternion(worldQuat);
-            anchor.quaternion.copy(worldQuat.invert());
-
-            anchor.add(mesh);
-            bone.add(anchor);
+            const anchor = new BABYLON.TransformNode(`${name}-anchor`, model3DScene);
+            const worldScale = new BABYLON.Vector3();
+            const worldRotation = new BABYLON.Quaternion();
+            const worldPosition = new BABYLON.Vector3();
+            bone.computeWorldMatrix(true).decompose(worldScale, worldRotation, worldPosition);
+            anchor.rotationQuaternion = BABYLON.Quaternion.Inverse(worldRotation);
+            anchor.parent = bone;
+            mesh.parent = anchor;
             
             livePlanes[name] = { canvas: cvs, texture: tex, mesh: mesh, anchor: anchor };
             updateLivePlaneCurvature(livePlanes[name]);
@@ -163,14 +182,17 @@
         function updateLivePlaneCurvature(plane) {
             const horizontalBend = parseFloat(c3dCurveHorizontal.value);
             const verticalBend = parseFloat(c3dCurveVertical.value);
-            const positions = plane.mesh.geometry.attributes.position;
-            for (let i = 0; i < positions.count; i++) {
-                const x = positions.getX(i);
-                const y = positions.getY(i);
-                positions.setZ(i, -(horizontalBend * x * x + verticalBend * y * y));
+            const positions = plane.mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            for (let i = 0; i < positions.length; i += 3) {
+                const x = positions[i];
+                const y = positions[i + 1];
+                positions[i + 2] = horizontalBend * x * x + verticalBend * y * y;
             }
-            positions.needsUpdate = true;
-            plane.mesh.geometry.computeVertexNormals();
+            const indices = plane.mesh.getIndices();
+            const normals = [];
+            BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+            plane.mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions, true);
+            plane.mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals, false);
         }
 
         function updateTextureCanvas(canvas, landmarks, indices, flipFor3D = false, rollAngle = 0) {
@@ -232,6 +254,13 @@
             ctx.restore();
         }
 
+        function updateLivePlaneTexture(plane) {
+            const textureContext = plane.texture.getContext();
+            textureContext.clearRect(0, 0, plane.canvas.width, plane.canvas.height);
+            textureContext.drawImage(plane.canvas, 0, 0);
+            plane.texture.update();
+        }
+
         const MOUTH_CONTOUR = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
         const LEFT_EYE_CONTOUR = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
         const RIGHT_EYE_CONTOUR = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398];
@@ -267,8 +296,8 @@
         });
 
         const accessoryManager = createAccessoryManager({
-            THREE,
-            GLTFLoader,
+            BABYLON,
+            getScene: () => model3DScene,
             getCharacter: () => selectedCharacter,
             getModelRoot: () => loadedModelRoot,
             isCameraActive: () => camera.isActive,
@@ -281,19 +310,12 @@
             canvas.width = canvas.offsetWidth * dpr;
             canvas.height = canvas.offsetHeight * dpr;
             
-            if (model3DRenderer && model3DCamera) {
-                model3DRenderer.setSize(canvas.width, canvas.height, false);
-                model3DCamera.aspect = canvas.width / canvas.height;
-                
-                let baseZ = model3DCamera.userData.baseZ !== undefined ? model3DCamera.userData.baseZ : 4.0;
-                let baseY = model3DCamera.userData.baseY !== undefined ? model3DCamera.userData.baseY : 0.0;
-                
+            if (model3DEngine && model3DCamera) {
+                model3DEngine.setSize(canvas.width, canvas.height);
                 model3DCamera.position.x = 0;
-                model3DCamera.position.z = fullscreen.isFullscreen ? baseZ * 1.5 : baseZ;
-                model3DCamera.position.y = baseY;
-                model3DCamera.lookAt(0, baseY, 0);
-                
-                model3DCamera.updateProjectionMatrix();
+                model3DCamera.position.z = fullscreen.isFullscreen ? model3DCameraBaseZ * 1.5 : model3DCameraBaseZ;
+                model3DCamera.position.y = model3DCameraBaseY;
+                model3DCamera.setTarget(new BABYLON.Vector3(0, model3DCameraBaseY, 0));
             }
 
             if (camera.isActive && video.videoWidth > 0) {
@@ -393,24 +415,24 @@
                 drawPIPVisualizer(landmarks);
             } else { drawPIPVisualizer(null); }
 
-            if ((selectedCharacter === 'custom' || selectedCharacter === CORE_CHARACTER_ID) && customSettings.is3D && model3DRenderer) {
+            if ((selectedCharacter === 'custom' || selectedCharacter === CORE_CHARACTER_ID) && customSettings.is3D && model3DEngine) {
                 const activeCx = isCustomStatic ? screenCenterX : cx;
                 const activeCy = isCustomStatic ? screenCenterY : cy;
                 update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy, pitchAxisScale);
                 
                 if (livePlanes.eye_left) {
-                    updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, false, angle);
-                    livePlanes.eye_left.texture.needsUpdate = true; 
-                    livePlanes.eye_left.mesh.scale.setScalar(eyeScale * 1.3);
+                    updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, true, angle);
+                    updateLivePlaneTexture(livePlanes.eye_left);
+                    livePlanes.eye_left.mesh.scaling.setAll(eyeScale * 1.3);
                 }
                 if (livePlanes.eye_right) {
-                    updateTextureCanvas(livePlanes.eye_right.canvas, landmarks, LEFT_EYE_CONTOUR, false, angle);
-                    livePlanes.eye_right.texture.needsUpdate = true; 
-                    livePlanes.eye_right.mesh.scale.setScalar(eyeScale * 1.3);
+                    updateTextureCanvas(livePlanes.eye_right.canvas, landmarks, LEFT_EYE_CONTOUR, true, angle);
+                    updateLivePlaneTexture(livePlanes.eye_right);
+                    livePlanes.eye_right.mesh.scaling.setAll(eyeScale * 1.3);
                 }
                 if (livePlanes.mouth) {
-                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, false, angle);
-                    livePlanes.mouth.texture.needsUpdate = true; 
+                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, true, angle);
+                    updateLivePlaneTexture(livePlanes.mouth);
 
                     let mouthOpenScale = 1.0;
                     if (landmarks) {
@@ -419,11 +441,10 @@
                         mouthOpenScale = 1.0 + (Math.abs(topLip.y - botLip.y) * 4.0);
                     }
                     const mouthWidthScale = 1.0 + (mouthOpenScale - 1.0) * 0.35;
-                    livePlanes.mouth.mesh.scale.set(mouthScale * 1.3 * mouthWidthScale, mouthScale * 1.3 * mouthOpenScale, mouthScale * 1.3);
+                    livePlanes.mouth.mesh.scaling.set(mouthScale * 1.3 * mouthWidthScale, mouthScale * 1.3 * mouthOpenScale, mouthScale * 1.3);
                 }
 
-                model3DRenderer.render(model3DScene, model3DCamera);
-                ctx.drawImage(model3DRenderer.domElement, 0, 0, canvas.width, canvas.height);
+                render3DScene();
                 return;
             }
 
@@ -536,76 +557,127 @@
         }
 
         function init3DCanvasRenderer() {
-            if (model3DRenderer) return;
+            if (model3DEngine) return;
             const w = canvas.width || 512; const h = canvas.height || 512;
-            model3DRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            model3DRenderer.setClearColor(0x000000, 0);
-            model3DRenderer.setSize(w, h, false);
-            model3DScene = new THREE.Scene();
-            model3DCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
-            model3DCamera.position.set(0, 0, 4.0);
-            const pmremGenerator = new THREE.PMREMGenerator(model3DRenderer);
-            pmremGenerator.compileEquirectangularShader();
-            const roomEnvironment = new RoomEnvironment();
-            try {
-                model3DEnvironment = pmremGenerator.fromScene(roomEnvironment);
-                model3DScene.environment = model3DEnvironment.texture;
-                model3DScene.environmentIntensity = 0.5; // lower brightness; 1 is the default
-            } finally {
-                roomEnvironment.dispose();
-                pmremGenerator.dispose();
-            }
-            const ambientLight = new THREE.AmbientLight(0xfffaf5, 0.8);
-            model3DScene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xfffaf5, 0.5);
+            model3DRenderCanvas = document.createElement('canvas');
+            model3DEngine = new BABYLON.Engine(model3DRenderCanvas, true, {
+                alpha: true,
+                preserveDrawingBuffer: true,
+                premultipliedAlpha: false
+            });
+            model3DEngine.setSize(w, h);
+            model3DScene = new BABYLON.Scene(model3DEngine);
+            model3DScene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+            model3DCamera = new BABYLON.FreeCamera('preview-camera', new BABYLON.Vector3(0, 0, 4), model3DScene);
+            model3DCamera.fov = Math.PI / 4;
+            model3DCamera.minZ = 0.1;
+            model3DCamera.maxZ = 1000;
+            model3DCamera.setTarget(BABYLON.Vector3.Zero());
+            const ambientLight = new BABYLON.HemisphericLight('preview-ambient', new BABYLON.Vector3(0, 1, 0), model3DScene);
+            ambientLight.diffuse = BABYLON.Color3.FromHexString("#fffaf5");
+            ambientLight.groundColor = BABYLON.Color3.FromHexString("#706b62");
+            ambientLight.intensity = 0.8;
+            const directionalLight = new BABYLON.DirectionalLight('preview-directional', new BABYLON.Vector3(-2, -4, -3), model3DScene);
+            directionalLight.diffuse = BABYLON.Color3.FromHexString("#fffaf5");
             directionalLight.position.set(2, 4, 3);
-            model3DScene.add(directionalLight);
+            directionalLight.intensity = 0.5;
             previewBackgroundManager.setLights(ambientLight, directionalLight);
+        }
+
+        function render3DScene() {
+            model3DScene.render();
+            ctx.drawImage(model3DRenderCanvas, 0, 0, canvas.width, canvas.height);
+        }
+
+        function clearLoaded3DModel() {
+            clearLivePlanes();
+            if (model3DAssetContainer) {
+                model3DAssetContainer.rootNodes.forEach(rootNode => {
+                    if (rootNode.parent === loadedModelRoot) rootNode.parent = null;
+                });
+                model3DAssetContainer.dispose();
+                model3DAssetContainer = null;
+            }
+            if (loadedModelRoot) {
+                loadedModelRoot.dispose(false, true);
+                loadedModelRoot = null;
+            }
+        }
+
+        function loadAssetContainer(modelPath) {
+            const url = new URL(modelPath, document.baseURI);
+            const pathSeparator = url.href.lastIndexOf('/') + 1;
+            return BABYLON.SceneLoader.LoadAssetContainerAsync(
+                url.href.slice(0, pathSeparator),
+                url.href.slice(pathSeparator),
+                model3DScene
+            );
         }
 
         function loadProceduralTest3DModel(openStudio = true) {
             init3DCanvasRenderer();
             reset3DFeatureOffsets();
             accessoryManager.resetRig();
+            clearLoaded3DModel();
             rigBonesByName = new Map();
-            while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
+            const root = new BABYLON.TransformNode("AvatarRoot", model3DScene);
+            root.position.y = -1.2;
+            root.baseY = -1.2;
+            loadedModelRoot = root;
 
-            const root = new THREE.Group(); root.name = "AvatarRoot";
-            root.position.y = -1.2; root.userData.baseY = -1.2; loadedModelRoot = root;
+            const spine0 = new BABYLON.TransformNode("spine_0", model3DScene);
+            spine0.parent = root;
+            const spineMat = new BABYLON.StandardMaterial("procedural-spine-material", model3DScene);
+            spineMat.diffuseColor = BABYLON.Color3.FromHexString("#3b82f6");
+            const spine0Mesh = BABYLON.MeshBuilder.CreateBox("spine-0-mesh", { width: 0.9, height: 0.7, depth: 0.5 }, model3DScene);
+            spine0Mesh.position.y = 0.35;
+            spine0Mesh.material = spineMat;
+            spine0Mesh.parent = spine0;
 
-            const spine0 = new THREE.Bone(); spine0.name = "spine_0";
-            const spineMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.6 });
-            const spine0Mesh = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.5), spineMat); spine0Mesh.position.y = 0.35; spine0.add(spine0Mesh);
+            const spine1 = new BABYLON.TransformNode("spine_1", model3DScene);
+            spine1.position.y = 0.7;
+            spine1.parent = spine0;
+            const spine1Mesh = BABYLON.MeshBuilder.CreateBox("spine-1-mesh", { width: 0.8, height: 0.6, depth: 0.45 }, model3DScene);
+            spine1Mesh.position.y = 0.3;
+            spine1Mesh.material = spineMat;
+            spine1Mesh.parent = spine1;
 
-            const spine1 = new THREE.Bone(); spine1.name = "spine_1"; spine1.position.y = 0.7;
-            const spine1Mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.45), spineMat); spine1Mesh.position.y = 0.3; spine1.add(spine1Mesh); spine0.add(spine1);
+            const neck = new BABYLON.TransformNode("neck", model3DScene);
+            neck.position.y = 0.6;
+            neck.parent = spine1;
+            const neckMat = new BABYLON.StandardMaterial("procedural-neck-material", model3DScene);
+            neckMat.diffuseColor = BABYLON.Color3.FromHexString("#fca5a5");
+            const neckMesh = BABYLON.MeshBuilder.CreateCylinder("neck-mesh", { height: 0.4, diameter: 0.3, tessellation: 16 }, model3DScene);
+            neckMesh.position.y = 0.2;
+            neckMesh.material = neckMat;
+            neckMesh.parent = neck;
 
-            const neck = new THREE.Bone(); neck.name = "neck"; neck.position.y = 0.6;
-            const neckMat = new THREE.MeshStandardMaterial({ color: 0xfca5a5 });
-            const neckMeshGroup = new THREE.Group();
-            neckMeshGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.4, 16), neckMat));
-            neckMeshGroup.position.y = 0.2; neck.add(neckMeshGroup); spine1.add(neck);
+            const head = new BABYLON.TransformNode("head", model3DScene);
+            head.position.y = 0.4;
+            head.parent = neck;
+            const headMat = new BABYLON.StandardMaterial("procedural-head-material", model3DScene);
+            headMat.diffuseColor = BABYLON.Color3.FromHexString("#60a5fa");
+            const headMesh = BABYLON.MeshBuilder.CreateSphere("head-mesh", { diameter: 1.4, segments: 32 }, model3DScene);
+            headMesh.material = headMat;
+            headMesh.parent = head;
 
-            const head = new THREE.Bone(); head.name = "head"; head.position.y = 0.4;
-            head.add(new THREE.Mesh(new THREE.SphereGeometry(0.7, 32, 32), new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.3 }))); neck.add(head);
+            const leftEyeBone = new BABYLON.TransformNode("eye_left", model3DScene);
+            leftEyeBone.position.set(-0.25, 0.15, 0.65);
+            leftEyeBone.parent = head;
+            const rightEyeBone = new BABYLON.TransformNode("eye_right", model3DScene);
+            rightEyeBone.position.set(0.25, 0.15, 0.65);
+            rightEyeBone.parent = head;
+            const mouthBone = new BABYLON.TransformNode("mouth", model3DScene);
+            mouthBone.position.set(0, -0.25, 0.65);
+            mouthBone.parent = head;
 
-            const leftEyeBone = new THREE.Bone(); leftEyeBone.name = "eye_left"; leftEyeBone.position.set(-0.25, 0.15, 0.65); head.add(leftEyeBone);
-            const rightEyeBone = new THREE.Bone(); rightEyeBone.name = "eye_right"; rightEyeBone.position.set(0.25, 0.15, 0.65); head.add(rightEyeBone);
-            const mouthBone = new THREE.Bone(); mouthBone.name = "mouth"; mouthBone.position.set(0, -0.25, 0.65); head.add(mouthBone);
-
-            root.add(spine0); model3DScene.add(root);
-
-            modelBones = { spine_0: spine0, spine_1: spine1, neck: neck, head: head, eye_left: leftEyeBone, eye_right: rightEyeBone, mouth: mouthBone };
-            rigBonesByName = new Map(Object.values(modelBones).filter(bone => bone?.isBone).map(bone => [bone.name.toLowerCase(), bone]));
-
+            modelBones = { spine_0: spine0, spine_1: spine1, neck, head, eye_left: leftEyeBone, eye_right: rightEyeBone, mouth: mouthBone };
+            rigBonesByName = new Map(Object.values(modelBones).map(bone => [bone.name.toLowerCase(), bone]));
             Object.values(modelBones).forEach(bone => {
-                if (bone) {
-                    bone.userData.initRot = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
-                    bone.userData.initScaleY = bone.scale.y;
-                }
+                bone.initRotationQuaternion = bone.rotationQuaternion?.clone()
+                    ?? BABYLON.Quaternion.FromEulerVector(bone.rotation);
             });
 
-            clearLivePlanes();
             if(modelBones.eye_left) createLivePlane(modelBones.eye_left, 'eye_left');
             if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right');
             if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
@@ -627,14 +699,13 @@
             init3DCanvasRenderer();
             const loadToken = ++coreLoadToken;
             accessoryManager.resetRig();
-            const loader = new GLTFLoader();
-            loader.load(new URL('models/core/character.glb', document.baseURI).href, (gltf) => {
+            loadAssetContainer('models/core/character.glb').then(assetContainer => {
                 if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) {
-                    accessoryManager.disposeModelResources(gltf.scene);
+                    accessoryManager.disposeModelResources(assetContainer);
                     return;
                 }
-                initializeLoaded3DModel(gltf, openStudio, !openStudio, CORE_CHARACTER_ID);
-            }, undefined, (error) => {
+                initializeLoaded3DModel(assetContainer, openStudio, !openStudio, CORE_CHARACTER_ID);
+            }).catch(error => {
                 if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) return;
                 console.error("Core character model failed to load:", error);
                 loadProceduralTest3DModel(openStudio);
@@ -644,49 +715,83 @@
             });
         }
 
-        function initializeLoaded3DModel(gltf, openStudio = true, isCoreModel = false, characterId = null) {
+        function initializeLoaded3DModel(assetContainer, openStudio = true, isCoreModel = false, characterId = null) {
             reset3DFeatureOffsets();
             accessoryManager.resetRig();
-            while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
-            model3DScene.add(gltf.scene);
-            loadedModelRoot = gltf.scene; loadedModelRoot.userData.baseY = 0;
+            clearLoaded3DModel();
+            model3DAssetContainer = assetContainer;
+            model3DAssetContainer.addAllToScene();
+            loadedModelRoot = new BABYLON.TransformNode("loaded-model-root", model3DScene);
+            loadedModelRoot.baseY = 0;
+            model3DAssetContainer.rootNodes.forEach(rootNode => loadedModelRoot.addChild(rootNode));
 
             modelBones = {};
             rigBonesByName = new Map();
-            gltf.scene.traverse((child) => {
-                if (child.isBone && child.name) {
-                    const normalizedName = child.name.trim().toLowerCase();
-                    if (!rigBonesByName.has(normalizedName)) rigBonesByName.set(normalizedName, child);
-                }
-                if (child.isBone || child.isObject3D) {
-                    const name = child.name.toLowerCase();
-                    if (name.includes('spine_0') || name === 'spine0') modelBones.spine_0 = child;
-                    else if (name.includes('spine_1') || name === 'spine1') modelBones.spine_1 = child;
-                    else if (name.includes('neck')) modelBones.neck = child;
-                    else if (name.includes('head')) modelBones.head = child;
-                    else if (name.includes('eye_left') || name.includes('lefteye') || name === 'eye.l') modelBones.eye_left = child;
-                    else if (name.includes('eye_right') || name.includes('righteye') || name === 'eye.r') modelBones.eye_right = child;
-                    else if (name.includes('mouth') || name.includes('jaw') || name.includes('lip')) modelBones.mouth = child;
-                }
+            const candidateNodes = new Set();
+            model3DAssetContainer.transformNodes.forEach(node => {
+                if (node === loadedModelRoot || node.isDescendantOf(loadedModelRoot)) candidateNodes.add(node);
+            });
+            model3DAssetContainer.meshes.forEach(mesh => {
+                if (mesh.isDescendantOf(loadedModelRoot)) candidateNodes.add(mesh);
+            });
+            model3DAssetContainer.skeletons.forEach(skeleton => skeleton.bones.forEach(bone => {
+                const linkedNode = bone.getTransformNode();
+                if (linkedNode) candidateNodes.add(linkedNode);
+                const normalizedName = bone.name?.trim().toLowerCase();
+                if (normalizedName && linkedNode && !rigBonesByName.has(normalizedName)) rigBonesByName.set(normalizedName, linkedNode);
+            }));
+
+            candidateNodes.forEach(child => {
+                if (!child.name) return;
+                const normalizedName = child.name.trim().toLowerCase();
+                if (!rigBonesByName.has(normalizedName)) rigBonesByName.set(normalizedName, child);
+                if (normalizedName.includes('spine_0') || normalizedName === 'spine0') modelBones.spine_0 = child;
+                else if (normalizedName.includes('spine_1') || normalizedName === 'spine1') modelBones.spine_1 = child;
+                else if (normalizedName.includes('neck')) modelBones.neck = child;
+                else if (normalizedName.includes('head')) modelBones.head = child;
+                else if (normalizedName.includes('eye_left') || normalizedName.includes('lefteye') || normalizedName === 'eye.l') modelBones.eye_left = child;
+                else if (normalizedName.includes('eye_right') || normalizedName.includes('righteye') || normalizedName === 'eye.r') modelBones.eye_right = child;
+                else if (normalizedName.includes('mouth') || normalizedName.includes('jaw') || normalizedName.includes('lip')) modelBones.mouth = child;
             });
 
             if (!modelBones.head) {
-                gltf.scene.traverse((child) => { if (child.isBone && !modelBones.head) modelBones.head = child; });
-                if (!modelBones.head) { modelBones.head = new THREE.Bone(); modelBones.head.position.y = 1.0; model3DScene.add(modelBones.head); }
+                modelBones.head = model3DAssetContainer.skeletons
+                    .flatMap(skeleton => skeleton.bones)
+                    .map(bone => bone.getTransformNode())
+                    .find(Boolean);
+                if (!modelBones.head) {
+                    modelBones.head = new BABYLON.TransformNode("head-fallback", model3DScene);
+                    modelBones.head.position.y = 1;
+                    modelBones.head.parent = loadedModelRoot;
+                }
             }
 
-            if (!modelBones.eye_left && modelBones.head) { modelBones.eye_left = new THREE.Bone(); modelBones.eye_left.name = "eye_left_virtual"; modelBones.eye_left.position.set(-0.25, 0.15, 0.65); modelBones.head.add(modelBones.eye_left); }
-            if (!modelBones.eye_right && modelBones.head) { modelBones.eye_right = new THREE.Bone(); modelBones.eye_right.name = "eye_right_virtual"; modelBones.eye_right.position.set(0.25, 0.15, 0.65); modelBones.head.add(modelBones.eye_right); }
-            if (!modelBones.mouth && modelBones.head) { modelBones.mouth = new THREE.Bone(); modelBones.mouth.name = "mouth_virtual"; modelBones.mouth.position.set(0, -0.25, 0.65); modelBones.head.add(modelBones.mouth); }
+            if (!modelBones.eye_left) {
+                modelBones.eye_left = new BABYLON.TransformNode("eye_left_virtual", model3DScene);
+                modelBones.eye_left.position.set(-0.25, 0.15, 0.65);
+                modelBones.eye_left.parent = modelBones.head;
+            }
+            if (!modelBones.eye_right) {
+                modelBones.eye_right = new BABYLON.TransformNode("eye_right_virtual", model3DScene);
+                modelBones.eye_right.position.set(0.25, 0.15, 0.65);
+                modelBones.eye_right.parent = modelBones.head;
+            }
+            if (!modelBones.mouth) {
+                modelBones.mouth = new BABYLON.TransformNode("mouth_virtual", model3DScene);
+                modelBones.mouth.position.set(0, -0.25, 0.65);
+                modelBones.mouth.parent = modelBones.head;
+            }
+            [modelBones.eye_left, modelBones.eye_right, modelBones.mouth].forEach(bone => {
+                if (!rigBonesByName.has(bone.name.toLowerCase())) rigBonesByName.set(bone.name.toLowerCase(), bone);
+            });
 
             Object.values(modelBones).forEach(bone => {
                 if (bone) {
-                    bone.userData.initRot = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
-                    bone.userData.initScaleY = bone.scale.y;
+                    bone.initRotationQuaternion = bone.rotationQuaternion?.clone()
+                        ?? BABYLON.Quaternion.FromEulerVector(bone.rotation);
                 }
             });
 
-            clearLivePlanes();
             if(modelBones.eye_left) createLivePlane(modelBones.eye_left, 'eye_left');
             if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right');
             if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
@@ -709,14 +814,12 @@
             init3DCanvasRenderer();
             coreLoadToken++;
             accessoryManager.resetRig();
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const loader = new GLTFLoader();
-                loader.parse(e.target.result, '', (gltf) => {
-                    initializeLoaded3DModel(gltf, true, false);
-                }, undefined, (error) => { alert('Could not parse GLB/GLTF model.'); });
-            };
-            reader.readAsArrayBuffer(file);
+            BABYLON.SceneLoader.LoadAssetContainerAsync("", file, model3DScene).then(assetContainer => {
+                initializeLoaded3DModel(assetContainer, true, false);
+            }).catch(error => {
+                console.error("Could not load custom 3D model:", error);
+                alert('Could not parse GLB/GLTF model.');
+            });
         }
 
         function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScale) {
@@ -738,17 +841,17 @@
                 const screenDx = (cx - canvas.width / 2) / canvas.width;
                 const screenDy = (cy - canvas.height / 2) / canvas.height;
                 const aspect = canvas.width / canvas.height;
-                const frustumHeight = 2 * Math.tan((model3DCamera.fov * Math.PI / 180) / 2) * model3DCamera.position.z;
+                const frustumHeight = 2 * Math.tan(model3DCamera.fov / 2) * model3DCamera.position.z;
                 const frustumWidth = frustumHeight * aspect;
                 
                 const targetTransX = screenDx * frustumWidth * 0.3; 
                 const targetTransY = -screenDy * frustumHeight * 0.3;
                 
-                if (loadedModelRoot.userData.tx === undefined) { loadedModelRoot.userData.tx = 0; loadedModelRoot.userData.ty = 0; }
-                loadedModelRoot.userData.tx = THREE.MathUtils.lerp(loadedModelRoot.userData.tx, targetTransX, 0.4);
-                loadedModelRoot.userData.ty = THREE.MathUtils.lerp(loadedModelRoot.userData.ty, targetTransY, 0.4);
-                loadedModelRoot.position.x = loadedModelRoot.userData.tx;
-                loadedModelRoot.position.y = loadedModelRoot.userData.baseY + loadedModelRoot.userData.ty;
+                if (loadedModelRoot.tx === undefined) { loadedModelRoot.tx = 0; loadedModelRoot.ty = 0; }
+                loadedModelRoot.tx += (targetTransX - loadedModelRoot.tx) * 0.4;
+                loadedModelRoot.ty += (targetTransY - loadedModelRoot.ty) * 0.4;
+                loadedModelRoot.position.x = loadedModelRoot.tx;
+                loadedModelRoot.position.y = loadedModelRoot.baseY + loadedModelRoot.ty;
 
                 swayPitch = -screenDy * 1.0; swayRoll = -screenDx * 1.2; 
             }
@@ -756,36 +859,37 @@
             const wSpine0 = 0.10; const wSpine1 = 0.20; const wNeck = 0.30; const wHead = 0.40;
 
             if (modelBones.spine_0) {
-                const init = modelBones.spine_0.userData.initRot || {x:0, y:0, z:0};
-                modelBones.spine_0.rotation.y = init.y + (totalYaw * wSpine0);
-                modelBones.spine_0.rotation.x = init.x + (totalPitch * wSpine0) + (swayPitch * 0.5);
-                modelBones.spine_0.rotation.z = init.z + (totalRoll * wSpine0) + (swayRoll * 0.5);
+                setTrackedRotation(
+                    modelBones.spine_0,
+                    totalYaw * wSpine0,
+                    totalPitch * wSpine0 + swayPitch * 0.5,
+                    totalRoll * wSpine0 + swayRoll * 0.5
+                );
             }
             if (modelBones.spine_1) {
-                const init = modelBones.spine_1.userData.initRot || {x:0, y:0, z:0};
-                modelBones.spine_1.rotation.y = init.y + (totalYaw * wSpine1);
-                modelBones.spine_1.rotation.x = init.x + (totalPitch * wSpine1) + (swayPitch * 0.5);
-                modelBones.spine_1.rotation.z = init.z + (totalRoll * wSpine1) + (swayRoll * 0.5);
+                setTrackedRotation(
+                    modelBones.spine_1,
+                    totalYaw * wSpine1,
+                    totalPitch * wSpine1 + swayPitch * 0.5,
+                    totalRoll * wSpine1 + swayRoll * 0.5
+                );
             }
             if (modelBones.neck) {
-                const init = modelBones.neck.userData.initRot || {x:0, y:0, z:0};
-                modelBones.neck.rotation.y = init.y + (totalYaw * wNeck);
-                modelBones.neck.rotation.x = init.x + (totalPitch * wNeck) - (swayPitch * 0.2);
-                modelBones.neck.rotation.z = init.z + (totalRoll * wNeck) - (swayRoll * 0.2);
+                setTrackedRotation(
+                    modelBones.neck,
+                    totalYaw * wNeck,
+                    totalPitch * wNeck - swayPitch * 0.2,
+                    totalRoll * wNeck - swayRoll * 0.2
+                );
             }
             if (modelBones.head) {
-                const init = modelBones.head.userData.initRot || {x:0, y:0, z:0};
-                modelBones.head.rotation.y = init.y + (totalYaw * wHead);
-                modelBones.head.rotation.x = init.x + (totalPitch * wHead);
-                modelBones.head.rotation.z = init.z + (totalRoll * wHead);
+                setTrackedRotation(modelBones.head, totalYaw * wHead, totalPitch * wHead, totalRoll * wHead);
             }
 
             if (modelBones.eye_left && modelBones.eye_right) {
                 const eyeGazeYaw = totalYaw * 0.05; 
-                const initL = modelBones.eye_left.userData.initRot || {y:0};
-                const initR = modelBones.eye_right.userData.initRot || {y:0};
-                modelBones.eye_left.rotation.y = initL.y + eyeGazeYaw;
-                modelBones.eye_right.rotation.y = initR.y + eyeGazeYaw;
+                setTrackedRotation(modelBones.eye_left, eyeGazeYaw, 0, 0);
+                setTrackedRotation(modelBones.eye_right, eyeGazeYaw, 0, 0);
             }
         }
 
@@ -985,13 +1089,13 @@
         }));
 
         function render3DStudioPreview() {
-            if (!isPreviewing3D || !model3DRenderer || !model3DScene || !model3DCamera) return;
+            if (!isPreviewing3D || !model3DEngine || !model3DScene || !model3DCamera) return;
             
             if (loadedModelRoot) { 
                 const s = c3dModelScale ? parseFloat(c3dModelScale.value) : 1.0; 
-                loadedModelRoot.scale.set(s, s, s); 
-                loadedModelRoot.rotation.y = orbitAngleX; 
-                loadedModelRoot.rotation.x = orbitAngleY; 
+                loadedModelRoot.scaling.set(s, s, s);
+                loadedModelRoot.rotation.y = orbitAngleX;
+                loadedModelRoot.rotation.x = orbitAngleY;
             }
             
             Object.entries(c3dFeatureOffsets).forEach(([name, sliders]) => {
@@ -1001,10 +1105,9 @@
 
             model3DCamera.position.z = parseFloat(c3dCamZ.value); 
             model3DCamera.position.y = parseFloat(c3dCamY.value); 
-            model3DCamera.lookAt(0, parseFloat(c3dCamY.value), 0);
+            model3DCamera.setTarget(new BABYLON.Vector3(0, parseFloat(c3dCamY.value), 0));
 
-            // Render the 3D scene
-            model3DRenderer.render(model3DScene, model3DCamera);
+            render3DScene();
 
             // Draw the WebGL renderer output onto the modal's 2D canvas
             const cvs = customPreviewCanvas;
@@ -1014,7 +1117,7 @@
                 cvs.height = cvs.offsetHeight;
             }
             ctxC.clearRect(0, 0, cvs.width, cvs.height);
-            ctxC.drawImage(model3DRenderer.domElement, 0, 0, cvs.width, cvs.height);
+            ctxC.drawImage(model3DRenderCanvas, 0, 0, cvs.width, cvs.height);
 
             // Loop the preview to reflect live slider and orbital camera changes
             requestAnimationFrame(render3DStudioPreview);
@@ -1055,8 +1158,11 @@
             customSettings.isStatic = cStatic.checked;
             
             if (customSettings.is3D && model3DCamera) {
-                model3DCamera.position.z = parseFloat(c3dCamZ.value); model3DCamera.position.y = parseFloat(c3dCamY.value); model3DCamera.lookAt(0, model3DCamera.position.y, 0);
-                model3DCamera.userData.baseZ = model3DCamera.position.z; model3DCamera.userData.baseY = model3DCamera.position.y;
+                model3DCamera.position.z = parseFloat(c3dCamZ.value);
+                model3DCamera.position.y = parseFloat(c3dCamY.value);
+                model3DCameraBaseZ = model3DCamera.position.z;
+                model3DCameraBaseY = model3DCamera.position.y;
+                model3DCamera.setTarget(new BABYLON.Vector3(0, model3DCameraBaseY, 0));
             }
             if (loadedModelRoot) { loadedModelRoot.rotation.x = 0; loadedModelRoot.rotation.y = 0; }
             orbitAngleX = 0; orbitAngleY = 0;

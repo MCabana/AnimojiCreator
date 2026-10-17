@@ -1,6 +1,6 @@
 # Animoji Creator
 
-A browser-based 2D and 3D character animation app. It uses Three.js and MediaPipe from CDNs.
+A browser-based 2D and 3D character animation app. It uses Babylon.js and MediaPipe from CDNs.
 
 ## Run locally
 
@@ -14,7 +14,7 @@ Camera access requires `localhost` or HTTPS. Opening `index.html` directly with 
 
 ## Project layout
 
-- `index.html` — page structure, CDN import map, and app entry point.
+- `index.html` — page structure, Babylon.js CDN scripts, and app entry point.
 - `styles.css` — application and responsive layout styles.
 - `js/main.js` — app setup, character selection, preview drawing, and feature coordination.
 - `js/characters.js` — 2D character palettes and drawing functions.
@@ -22,7 +22,7 @@ Camera access requires `localhost` or HTTPS. Opening `index.html` directly with 
 - `js/recording.js` — canvas video recording.
 - `js/fullscreen.js` — fullscreen viewport controls.
 - `js/custom-character-editor.js` — custom 2D image upload, face masking, feature placement, and magnifier.
-- `js/preview-background.js` — still/video backgrounds, solid color, and optional media-matched 3D lighting.
+- `js/preview-background.js` — still/video backgrounds, solid color, and optional media-matched Babylon.js lighting.
 - `js/accessory-manager.js` — accessory catalog validation, character compatibility selectors, skeleton remapping, and accessory resource lifecycle.
 - `models/core/` — core 3D character model.
 - `models/attachments/hats/` and `models/attachments/shirts/` — selectable, rig-bound accessories.
