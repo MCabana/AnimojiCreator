@@ -84,14 +84,39 @@
         let lastMouseX = 0;
         let lastMouseY = 0;
         
-        let smoothedYaw = 0;
-        let smoothedPitch = 0;
-        let smoothedRoll = 0;
+        const headRotationFilters = {
+            yaw: { value: null, derivative: 0, time: 0 },
+            pitch: { value: null, derivative: 0, time: 0 },
+            roll: { value: null, derivative: 0, time: 0 }
+        };
         let fullscreen = { isFullscreen: false };
         
         const customSettings = { e1x: 0.35, e1y: 0.4, e2x: 0.65, e2y: 0.4, mx: 0.5, my: 0.7, isStatic: false, is3D: false };
 
         let livePlanes = {};
+
+        function smoothHeadRotation(filter, value, time, isAngle = false) {
+            if (filter.value === null || time - filter.time > 500) {
+                filter.value = value;
+                filter.derivative = 0;
+                filter.time = time;
+                return value;
+            }
+
+            const deltaTime = Math.max((time - filter.time) / 1000, 0.001);
+            let delta = value - filter.value;
+            if (isAngle) delta = Math.atan2(Math.sin(delta), Math.cos(delta));
+
+            const derivative = delta / deltaTime;
+            const derivativeAlpha = 1 / (1 + (1 / (2 * Math.PI)) / deltaTime);
+            filter.derivative += derivativeAlpha * (derivative - filter.derivative);
+
+            const cutoff = Math.min(3, 1.2 + 0.15 * Math.abs(filter.derivative));
+            const valueAlpha = 1 / (1 + (1 / (2 * Math.PI * cutoff)) / deltaTime);
+            filter.value += valueAlpha * delta;
+            filter.time = time;
+            return filter.value;
+        }
 
         function clearLivePlanes() {
             Object.values(livePlanes).forEach(plane => {
@@ -1026,10 +1051,11 @@
         function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy) {
             if (!modelBones.head) return;
             
-            const targetYaw = yaw / 100; const targetPitch = pitch / 100; const targetRoll = roll; 
-            smoothedYaw = THREE.MathUtils.lerp(smoothedYaw, targetYaw, 0.7);
-            smoothedPitch = THREE.MathUtils.lerp(smoothedPitch, targetPitch, 0.7);
-            smoothedRoll = THREE.MathUtils.lerp(smoothedRoll, targetRoll, 0.7);
+            const targetYaw = yaw / 200; const targetPitch = pitch / 100; const targetRoll = roll;
+            const now = performance.now();
+            const smoothedYaw = smoothHeadRotation(headRotationFilters.yaw, targetYaw, now);
+            const smoothedPitch = smoothHeadRotation(headRotationFilters.pitch, targetPitch, now);
+            const smoothedRoll = smoothHeadRotation(headRotationFilters.roll, targetRoll, now, true);
 
             const totalYaw = smoothedYaw * 1.0;
             const totalPitch = smoothedPitch * 0.8;
