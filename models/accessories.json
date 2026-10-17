@@ -1,0 +1,31 @@
+{
+  "characters": [
+    {
+      "id": "standard",
+      "name": "Standard"
+    }
+  ],
+  "accessories": [
+    {
+      "id": "cowboy-hat",
+      "name": "Cowboy Hat",
+      "slot": "hat",
+      "model": "models/attachments/hats/cowboyHat.glb",
+      "compatibleCharacters": ["standard"]
+    },
+    {
+      "id": "cowboy-shirt",
+      "name": "Cowboy Shirt",
+      "slot": "shirt",
+      "model": "models/attachments/shirts/cowboyShirt.glb",
+      "compatibleCharacters": ["standard"]
+    },
+    {
+      "id": "officer-shirt",
+      "name": "Officer Shirt",
+      "slot": "shirt",
+      "model": "models/attachments/shirts/officerShirt.glb",
+      "compatibleCharacters": ["standard"]
+    }
+  ]
+}
