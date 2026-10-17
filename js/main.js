@@ -134,7 +134,15 @@
             ctxC.fill();
 
             const tex = new THREE.CanvasTexture(cvs);
-            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+            tex.colorSpace = THREE.SRGBColorSpace;
+            const mat = new THREE.MeshStandardMaterial({
+                map: tex,
+                transparent: true,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                roughness: 1,
+                metalness: 0
+            });
             
             const geo = new THREE.PlaneGeometry(0.5, 0.5, 16, 16);
 
