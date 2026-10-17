@@ -197,7 +197,7 @@
                 padding: 10px;
             }
         }
-        @media (orientation: landscape) and (max-height: 600px) {
+        @media (max-width: 760px) and (min-aspect-ratio: 4 / 3) {
             .app-shell {
                 gap: 4px;
                 padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
