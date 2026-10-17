@@ -14,6 +14,13 @@
       "compatibleCharacters": ["standard"]
     },
     {
+      "id": "firefighter-helmet",
+      "name": "Firefighter Helmet",
+      "slot": "hat",
+      "model": "models/attachments/hats/firefighterHelmet.glb",
+      "compatibleCharacters": ["standard"]
+    },
+    {
       "id": "cowboy-shirt",
       "name": "Cowboy Shirt",
       "slot": "shirt",
