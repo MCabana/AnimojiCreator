@@ -17,6 +17,10 @@
 
         const statusText = document.getElementById('status-text');
         const statusIndicator = document.getElementById('status-indicator');
+        const backgroundFile = document.getElementById('background-file');
+        const backgroundColor = document.getElementById('background-color');
+        const backgroundStatus = document.getElementById('background-status');
+        const clearBackgroundButton = document.getElementById('btn-clear-background');
         const btnCamera = document.getElementById('btn-camera');
         const pipContainer = document.getElementById('pip-container');
         const canvas = document.getElementById('render-canvas');
@@ -41,6 +45,11 @@
         let noseScale = 1.0;
         let mouthScale = 1.0;
         let showPip = false;
+        let previewBackgroundColor = backgroundColor.value;
+        let previewBackground = null;
+        let previewBackgroundUrl = null;
+        let backgroundLoadToken = 0;
+        let backgroundFrameRequest = 0;
 
         let offsetRoll = 0;
         let offsetYaw = 0;
@@ -254,8 +263,9 @@
         function drawScene() {
             if (canvas.width === 0 || (camera.isActive && video.videoWidth === 0)) return;
             
-            ctx.fillStyle = '#fdf2cb';
+            ctx.fillStyle = previewBackgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawPreviewBackground();
             
             let cx = canvas.width / 2;
             let cy = canvas.height / 2;
@@ -455,10 +465,117 @@
             }
         }
 
+        function drawPreviewBackground() {
+            if (!previewBackground) return;
+            const source = previewBackground.element;
+            const sourceWidth = source.videoWidth || source.naturalWidth;
+            const sourceHeight = source.videoHeight || source.naturalHeight;
+            if (!sourceWidth || !sourceHeight) return;
+
+            const scale = Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight);
+            const width = sourceWidth * scale;
+            const height = sourceHeight * scale;
+            ctx.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+        }
+
+        function setBackgroundStatus(message, isError = false) {
+            backgroundStatus.textContent = message;
+            backgroundStatus.className = `mt-2 truncate text-[10px] ${isError ? 'text-rose-600' : 'text-slate-500'}`;
+        }
+
+        function releasePreviewBackground() {
+            if (backgroundFrameRequest) {
+                cancelAnimationFrame(backgroundFrameRequest);
+                backgroundFrameRequest = 0;
+            }
+            if (previewBackground?.type === 'video') {
+                previewBackground.element.pause();
+                previewBackground.element.removeAttribute('src');
+                previewBackground.element.load();
+            }
+            previewBackground = null;
+            if (previewBackgroundUrl) {
+                URL.revokeObjectURL(previewBackgroundUrl);
+                previewBackgroundUrl = null;
+            }
+        }
+
+        function renderBackgroundVideo(token) {
+            if (token !== backgroundLoadToken || previewBackground?.type !== 'video') return;
+            if (camera.isActive) {
+                backgroundFrameRequest = 0;
+                return;
+            }
+            drawScene();
+            backgroundFrameRequest = requestAnimationFrame(() => renderBackgroundVideo(token));
+        }
+
+        function loadPreviewBackground(file) {
+            const token = ++backgroundLoadToken;
+            releasePreviewBackground();
+            if (!file) {
+                backgroundFile.value = '';
+                clearBackgroundButton.disabled = true;
+                setBackgroundStatus("No background selected");
+                drawScene();
+                return;
+            }
+
+            previewBackgroundUrl = URL.createObjectURL(file);
+            clearBackgroundButton.disabled = false;
+            setBackgroundStatus(`Loading ${file.name}...`);
+
+            let loadFailed = false;
+            const failLoad = (error) => {
+                if (token !== backgroundLoadToken || loadFailed) return;
+                loadFailed = true;
+                console.error("Could not load background media:", error);
+                releasePreviewBackground();
+                backgroundFile.value = '';
+                clearBackgroundButton.disabled = true;
+                setBackgroundStatus(`Could not load ${file.name}`, true);
+                drawScene();
+            };
+
+            if (file.type.startsWith('image/')) {
+                const image = new Image();
+                previewBackground = { type: 'image', element: image };
+                image.onload = () => {
+                    if (token !== backgroundLoadToken) return;
+                    setBackgroundStatus(file.name);
+                    drawScene();
+                };
+                image.onerror = () => failLoad(new Error(`Unsupported or invalid image: ${file.name}`));
+                image.src = previewBackgroundUrl;
+                return;
+            }
+
+            if (file.type.startsWith('video/')) {
+                const backgroundVideo = document.createElement('video');
+                backgroundVideo.muted = true;
+                backgroundVideo.loop = true;
+                backgroundVideo.playsInline = true;
+                previewBackground = { type: 'video', element: backgroundVideo };
+                backgroundVideo.addEventListener('loadeddata', () => {
+                    if (token !== backgroundLoadToken) return;
+                    setBackgroundStatus(`${file.name} (looping)`);
+                    drawScene();
+                    if (!camera.isActive) renderBackgroundVideo(token);
+                }, { once: true });
+                backgroundVideo.addEventListener('error', () => failLoad(new Error(`Unsupported or invalid video: ${file.name}`)), { once: true });
+                backgroundVideo.src = previewBackgroundUrl;
+                backgroundVideo.play().catch(failLoad);
+                return;
+            }
+
+            failLoad(new Error(`Unsupported background file type: ${file.type || 'unknown'}`));
+        }
+
         function init3DCanvasRenderer() {
             if (model3DRenderer) return;
             const w = canvas.width || 512; const h = canvas.height || 512;
             model3DRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            model3DRenderer.setClearColor(0x000000, 0);
             model3DRenderer.setSize(w, h, false);
             model3DScene = new THREE.Scene();
             model3DCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
@@ -1099,6 +1216,12 @@
         sliderEyes.addEventListener('input', (e) => { eyeScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
         sliderNose.addEventListener('input', (e) => { noseScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
         sliderMouth.addEventListener('input', (e) => { mouthScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
+        backgroundFile.addEventListener('change', () => loadPreviewBackground(backgroundFile.files[0]));
+        clearBackgroundButton.addEventListener('click', () => loadPreviewBackground(null));
+        backgroundColor.addEventListener('input', () => {
+            previewBackgroundColor = backgroundColor.value;
+            drawScene();
+        });
 
         btnRecenter.addEventListener('click', () => { requestRecenter = true; });
 

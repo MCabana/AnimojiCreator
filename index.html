@@ -146,6 +146,21 @@
                 </div>
             </div>
         </div>
+        <div>
+            <h3 class="mb-3 text-xs font-bold tracking-wider text-slate-400">BACKGROUND</h3>
+            <label for="background-color" class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
+                Solid color
+                <input id="background-color" type="color" value="#fdf2cb" aria-label="Solid background color" class="h-8 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1">
+            </label>
+            <div class="flex gap-2">
+                <label for="background-file" class="flex-1 cursor-pointer rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-center text-xs font-bold text-indigo-600 transition hover:bg-indigo-100">
+                    Choose Image / Video
+                    <input id="background-file" type="file" accept="image/*,video/*" class="hidden">
+                </label>
+                <button id="btn-clear-background" type="button" disabled class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition enabled:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Clear</button>
+            </div>
+            <p id="background-status" class="mt-2 truncate text-[10px] text-slate-500" aria-live="polite">No background selected</p>
+        </div>
     </aside>
         </main>
     </div>

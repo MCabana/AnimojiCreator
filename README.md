@@ -47,3 +47,7 @@ Edit `models/accessories.json` to add or change accessories. Each entry in `comp
 ```
 
 `cowboy` (Standard) is currently the only rigged 3D character. The 2D animals do not have 3D skeletons for accessories to attach to yet.
+
+## Preview backgrounds
+
+Use the **Background** controls in the studio panel to choose a solid color, still image, or video file. The solid color is used when no image or video is selected. Images are cropped to cover the character viewport; videos are muted and loop automatically. The selected background is composited behind both 2D and 3D characters and is included in canvas recordings. Use **Clear** to remove a selected image or video and return to the chosen solid color.
