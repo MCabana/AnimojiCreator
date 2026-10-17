@@ -26,6 +26,21 @@
       "slot": "shirt",
       "model": "models/attachments/shirts/officerShirt.glb",
       "compatibleCharacters": ["standard"]
+    },
+    {
+      "id": "firefighter-shirt",
+      "name": "Firefighter Shirt",
+      "slot": "shirt",
+      "model": "models/attachments/shirts/firefighterShirt.glb",
+      "compatibleCharacters": ["standard"]
+    }
+    ,
+    {
+      "id": "assassin-shirt",
+      "name": "Assassin Shirt",
+      "slot": "shirt",
+      "model": "models/attachments/shirts/assassinShirt.glb",
+      "compatibleCharacters": ["standard"]
     }
   ]
 }

@@ -32,9 +32,10 @@
         const btnTogglePip = document.getElementById('btn-toggle-pip');
         const btnRecenter = document.getElementById('btn-recenter');
 
+        const CORE_CHARACTER_ID = 'standard';
         let selectedCharacter = 'bear'; 
         let selectedVariant = 0;
-        const savedVariants = { bear: 0, cat: 0, moose: 0, dog: 0, bird: 0, penguin: 0, cowboy: 0, custom: 0 };
+        const savedVariants = { bear: 0, cat: 0, moose: 0, dog: 0, bird: 0, penguin: 0, [CORE_CHARACTER_ID]: 0, custom: 0 };
         
         let eyeScale = 1.0;
         let noseScale = 1.0;
@@ -312,7 +313,7 @@
                 drawPIPVisualizer(landmarks);
             } else { drawPIPVisualizer(null); }
 
-            if ((selectedCharacter === 'custom' || selectedCharacter === 'cowboy') && customSettings.is3D && model3DRenderer) {
+            if ((selectedCharacter === 'custom' || selectedCharacter === CORE_CHARACTER_ID) && customSettings.is3D && model3DRenderer) {
                 const activeCx = isCustomStatic ? screenCenterX : cx;
                 const activeCy = isCustomStatic ? screenCenterY : cy;
                 update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy);
@@ -407,7 +408,7 @@
             const lEyePos = getRotatedPos(lEyeTargetX, lEyeTargetY, false, true);
             const mouthPos = getRotatedPos(mTargetX, mTargetY, true, false); 
 
-            if (selectedCharacter !== 'custom' && selectedCharacter !== 'cowboy') {
+            if (selectedCharacter !== 'custom' && selectedCharacter !== CORE_CHARACTER_ID) {
                 ctx.save();
                 ctx.translate(cx, cy);
                 ctx.rotate(angle);
@@ -440,7 +441,7 @@
                 drawAlignedCutout(landmarks, MOUTH_CONTOUR, mouthPos.x, mouthPos.y, finalMouthScale, mouthDrawAngle, skinColor, null, 1.0);
             }
             
-            if (selectedCharacter !== 'custom' && selectedCharacter !== 'cowboy' && selectedCharacter !== 'bird' && selectedCharacter !== 'penguin') {
+            if (selectedCharacter !== 'custom' && selectedCharacter !== CORE_CHARACTER_ID && selectedCharacter !== 'bird' && selectedCharacter !== 'penguin') {
                 ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle); ctx.translate(-cx, -cy);
                 ctx.fillStyle = '#000';
                 if (selectedCharacter === 'cat') {
@@ -548,16 +549,16 @@
             clearMountedAccessories();
             const loader = new GLTFLoader();
             loader.load(new URL('models/core/character.glb', document.baseURI).href, (gltf) => {
-                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== 'cowboy')) {
+                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) {
                     disposeImportedModel(gltf.scene);
                     return;
                 }
-                initializeLoaded3DModel(gltf, openStudio, !openStudio, 'cowboy');
+                initializeLoaded3DModel(gltf, openStudio, !openStudio, CORE_CHARACTER_ID);
             }, undefined, (error) => {
-                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== 'cowboy')) return;
+                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) return;
                 console.error("Core character model failed to load:", error);
                 loadProceduralTest3DModel(openStudio);
-                if (selectedCharacter === 'cowboy') {
+                if (selectedCharacter === CORE_CHARACTER_ID) {
                     setAccessoryStatus("The core character rig could not be loaded; accessories are unavailable.");
                 }
             });
@@ -1077,10 +1078,10 @@
                 penguin: 'bg-slate-200 text-slate-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-slate-400 shadow-sm transition active:scale-95'
             };
             if (characterButtons[activeChar]) characterButtons[activeChar].className = activeClasses[activeChar];
-            if (activeChar === 'cowboy') btnCowboy.className = 'bg-amber-100 text-amber-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-amber-300 shadow-sm transition active:scale-95';
+            if (activeChar === CORE_CHARACTER_ID) btnCowboy.className = 'bg-amber-100 text-amber-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-amber-300 shadow-sm transition active:scale-95';
             if (activeChar === 'custom') btnCustomTrig.className = 'w-full bg-indigo-500 text-white rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-indigo-600 shadow-md transition active:scale-95';
             
-            selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom' || activeChar === 'cowboy');
+            selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom' || activeChar === CORE_CHARACTER_ID);
             if(!camera.isActive) drawScene();
         }
 
@@ -1089,7 +1090,7 @@
             button.onclick = () => updateCharacterSelection(character);
         });
         btnCowboy.onclick = () => {
-            updateCharacterSelection('cowboy');
+            updateCharacterSelection(CORE_CHARACTER_ID);
             loadTest3DModel(false);
         };
         btnLoadTest3D.onclick = () => loadTest3DModel();
