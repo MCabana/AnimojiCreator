@@ -19,6 +19,7 @@
         const statusIndicator = document.getElementById('status-indicator');
         const backgroundFile = document.getElementById('background-file');
         const backgroundColor = document.getElementById('background-color');
+        const backgroundLightingMatch = document.getElementById('background-lighting-match');
         const backgroundStatus = document.getElementById('background-status');
         const clearBackgroundButton = document.getElementById('btn-clear-background');
         const btnCamera = document.getElementById('btn-camera');
@@ -50,6 +51,14 @@
         let previewBackgroundUrl = null;
         let backgroundLoadToken = 0;
         let backgroundFrameRequest = 0;
+        let lastBackgroundLightingSample = 0;
+        const backgroundSampleCanvas = document.createElement('canvas');
+        backgroundSampleCanvas.width = 16;
+        backgroundSampleCanvas.height = 16;
+        const backgroundSampleContext = backgroundSampleCanvas.getContext('2d', { willReadFrequently: true });
+        const averageBackgroundColor = new THREE.Color();
+        let modelAmbientLight = null;
+        let modelDirectionalLight = null;
 
         let offsetRoll = 0;
         let offsetYaw = 0;
@@ -292,6 +301,12 @@
             ctx.fillStyle = previewBackgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             drawPreviewBackground();
+            if (backgroundLightingMatch.checked
+                && previewBackground?.type === 'video'
+                && performance.now() - lastBackgroundLightingSample >= 500) {
+                update3DLightingFromBackground(previewBackground.element);
+                lastBackgroundLightingSample = performance.now();
+            }
             
             let cx = canvas.width / 2;
             let cy = canvas.height / 2;
@@ -517,6 +532,55 @@
             ctx.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
         }
 
+        function reset3DLightingTint() {
+            modelAmbientLight?.color.set(0xffffff);
+            modelDirectionalLight?.color.set(0xffffff);
+        }
+
+        function update3DLightingFromBackground(source) {
+            if (!modelAmbientLight || !modelDirectionalLight) return;
+
+            const sourceWidth = source.videoWidth || source.naturalWidth;
+            const sourceHeight = source.videoHeight || source.naturalHeight;
+            if (!sourceWidth || !sourceHeight) return;
+
+            const scale = Math.max(
+                backgroundSampleCanvas.width / sourceWidth,
+                backgroundSampleCanvas.height / sourceHeight
+            );
+            const width = sourceWidth * scale;
+            const height = sourceHeight * scale;
+            try {
+                backgroundSampleContext.clearRect(0, 0, backgroundSampleCanvas.width, backgroundSampleCanvas.height);
+                backgroundSampleContext.drawImage(
+                    source,
+                    (backgroundSampleCanvas.width - width) / 2,
+                    (backgroundSampleCanvas.height - height) / 2,
+                    width,
+                    height
+                );
+
+                const { data } = backgroundSampleContext.getImageData(0, 0, backgroundSampleCanvas.width, backgroundSampleCanvas.height);
+                let red = 0;
+                let green = 0;
+                let blue = 0;
+                for (let index = 0; index < data.length; index += 4) {
+                    red += data[index];
+                    green += data[index + 1];
+                    blue += data[index + 2];
+                }
+                const count = data.length / 4;
+                averageBackgroundColor.setRGB(red / count / 255, green / count / 255, blue / count / 255, THREE.SRGBColorSpace);
+            } catch (error) {
+                console.error("Could not sample the preview background for 3D lighting:", error);
+                return;
+            }
+
+            const white = new THREE.Color(0xffffff);
+            modelAmbientLight.color.copy(white).lerp(averageBackgroundColor, 0.6);
+            modelDirectionalLight.color.copy(white).lerp(averageBackgroundColor, 0.45);
+        }
+
         function setBackgroundStatus(message, isError = false) {
             backgroundStatus.textContent = message;
             backgroundStatus.className = `mt-2 truncate text-[10px] ${isError ? 'text-rose-600' : 'text-slate-500'}`;
@@ -552,10 +616,12 @@
         function loadPreviewBackground(file) {
             const token = ++backgroundLoadToken;
             releasePreviewBackground();
+            reset3DLightingTint();
             if (!file) {
                 backgroundFile.value = '';
                 clearBackgroundButton.disabled = true;
                 setBackgroundStatus("No background selected");
+                reset3DLightingTint();
                 drawScene();
                 return;
             }
@@ -573,6 +639,7 @@
                 backgroundFile.value = '';
                 clearBackgroundButton.disabled = true;
                 setBackgroundStatus(`Could not load ${file.name}`, true);
+                reset3DLightingTint();
                 drawScene();
             };
 
@@ -581,6 +648,7 @@
                 previewBackground = { type: 'image', element: image };
                 image.onload = () => {
                     if (token !== backgroundLoadToken) return;
+                    if (backgroundLightingMatch.checked) update3DLightingFromBackground(image);
                     setBackgroundStatus(file.name);
                     drawScene();
                 };
@@ -597,6 +665,8 @@
                 previewBackground = { type: 'video', element: backgroundVideo };
                 backgroundVideo.addEventListener('loadeddata', () => {
                     if (token !== backgroundLoadToken) return;
+                    if (backgroundLightingMatch.checked) update3DLightingFromBackground(backgroundVideo);
+                    lastBackgroundLightingSample = performance.now();
                     setBackgroundStatus(`${file.name} (looping)`);
                     drawScene();
                     if (!camera.isActive) renderBackgroundVideo(token);
@@ -630,9 +700,13 @@
                 roomEnvironment.dispose();
                 pmremGenerator.dispose();
             }
-            model3DScene.add(new THREE.AmbientLight(0xffffff, 1.2));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(2, 4, 3);
-            model3DScene.add(dirLight);
+            modelAmbientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            model3DScene.add(modelAmbientLight);
+            modelDirectionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            modelDirectionalLight.position.set(2, 4, 3);
+            model3DScene.add(modelDirectionalLight);
+            if (backgroundLightingMatch.checked && previewBackground) update3DLightingFromBackground(previewBackground.element);
+            else reset3DLightingTint();
         }
 
         function loadProceduralTest3DModel(openStudio = true) {
@@ -1260,6 +1334,14 @@
         clearBackgroundButton.addEventListener('click', () => loadPreviewBackground(null));
         backgroundColor.addEventListener('input', () => {
             previewBackgroundColor = backgroundColor.value;
+            drawScene();
+        });
+        backgroundLightingMatch.addEventListener('change', () => {
+            if (backgroundLightingMatch.checked && previewBackground) {
+                update3DLightingFromBackground(previewBackground.element);
+            } else {
+                reset3DLightingTint();
+            }
             drawScene();
         });
 

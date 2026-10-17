@@ -152,6 +152,14 @@
                 Solid color
                 <input id="background-color" type="color" value="#fdf2cb" aria-label="Solid background color" class="h-8 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1">
             </label>
+            <label for="background-lighting-match" class="mb-2 flex cursor-pointer items-center justify-between text-xs font-semibold text-slate-600">
+                Match 3D lighting to media
+                <span class="relative inline-flex items-center">
+                    <input id="background-lighting-match" type="checkbox" role="switch" checked class="peer sr-only">
+                    <span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-indigo-500 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-indigo-500"></span>
+                    <span class="pointer-events-none absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
+                </span>
+            </label>
             <div class="flex gap-2">
                 <label for="background-file" class="flex-1 cursor-pointer rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-center text-xs font-bold text-indigo-600 transition hover:bg-indigo-100">
                     Choose Image / Video
