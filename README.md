@@ -16,11 +16,14 @@ Camera access requires `localhost` or HTTPS. Opening `index.html` directly with 
 
 - `index.html` — page structure, CDN import map, and app entry point.
 - `styles.css` — application and responsive layout styles.
-- `js/main.js` — app setup, character selection, drawing, and 3D model integration.
+- `js/main.js` — app setup, character selection, preview drawing, and feature coordination.
 - `js/characters.js` — 2D character palettes and drawing functions.
 - `js/camera.js` — camera access and MediaPipe face tracking.
 - `js/recording.js` — canvas video recording.
 - `js/fullscreen.js` — fullscreen viewport controls.
+- `js/custom-character-editor.js` — custom 2D image upload, face masking, feature placement, and magnifier.
+- `js/preview-background.js` — still/video backgrounds, solid color, and optional media-matched 3D lighting.
+- `js/accessory-manager.js` — accessory catalog validation, character compatibility selectors, skeleton remapping, and accessory resource lifecycle.
 - `models/core/` — core 3D character model.
 - `models/attachments/hats/` and `models/attachments/shirts/` — selectable, rig-bound accessories.
 - `models/accessories.json` — accessory names, slots, model paths, and compatible character IDs.

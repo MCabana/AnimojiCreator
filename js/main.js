@@ -4,6 +4,9 @@
         import { setupCamera } from "./camera.js";
         import { setupRecording } from "./recording.js";
         import { setupFullscreen } from "./fullscreen.js";
+        import { createCustomCharacterEditor } from "./custom-character-editor.js";
+        import { createPreviewBackground } from "./preview-background.js";
+        import { createAccessoryManager } from "./accessory-manager.js";
         import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
         import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
@@ -46,19 +49,7 @@
         let noseScale = 1.0;
         let mouthScale = 1.0;
         let showPip = false;
-        let previewBackgroundColor = backgroundColor.value;
-        let previewBackground = null;
-        let previewBackgroundUrl = null;
-        let backgroundLoadToken = 0;
-        let backgroundFrameRequest = 0;
-        let lastBackgroundLightingSample = 0;
-        const backgroundSampleCanvas = document.createElement('canvas');
-        backgroundSampleCanvas.width = 16;
-        backgroundSampleCanvas.height = 16;
-        const backgroundSampleContext = backgroundSampleCanvas.getContext('2d', { willReadFrequently: true });
-        const averageBackgroundColor = new THREE.Color();
-        let modelAmbientLight = null;
-        let modelDirectionalLight = null;
+        let previewBackgroundManager = null;
 
         let offsetRoll = 0;
         let offsetYaw = 0;
@@ -66,9 +57,6 @@
         let neutralFaceAspectRatio = null;
         let requestRecenter = false;
 
-        let customBaseImage = null; 
-        let customFaceLandmarks = null; 
-        let customImageMasked = null; 
         let customBgDrawW = 256;
         let customBgDrawH = 256;
         let customStaticScaleMult = 1.0;
@@ -79,12 +67,6 @@
         let modelBones = {};
         let isPreviewing3D = false;
         let rigBonesByName = new Map();
-        let accessoryRigReady = false;
-        const mountedAccessories = new Map();
-        const accessoryLoadTokens = new Map();
-        const selectedAccessoryIds = new Map();
-        let accessoryCatalog = null;
-        let loadedCoreCharacterId = null;
         let coreLoadToken = 0;
         
         let loadedModelRoot = null;
@@ -102,6 +84,7 @@
         let fullscreen = { isFullscreen: false };
         
         const customSettings = { e1x: 0.35, e1y: 0.4, e2x: 0.65, e2y: 0.4, mx: 0.5, my: 0.7, isStatic: false, is3D: false };
+        let customImageEditor = null;
 
         let livePlanes = {};
 
@@ -245,8 +228,6 @@
         const MOUTH_CONTOUR = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
         const LEFT_EYE_CONTOUR = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
         const RIGHT_EYE_CONTOUR = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398];
-        const FACE_OVAL_CONTOUR = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-
         function setStatus(text, colorClass) {
             statusText.textContent = text;
             statusIndicator.className = `w-2 h-2 rounded-full ${colorClass}`;
@@ -263,6 +244,27 @@
             showPip: () => showPip,
             setStatus,
             resizeCanvases,
+            drawScene
+        });
+
+        previewBackgroundManager = createPreviewBackground({
+            canvas,
+            context: ctx,
+            fileInput: backgroundFile,
+            colorInput: backgroundColor,
+            lightingMatchInput: backgroundLightingMatch,
+            status: backgroundStatus,
+            clearButton: clearBackgroundButton,
+            renderPreview: drawScene,
+            isCameraActive: () => camera.isActive
+        });
+
+        const accessoryManager = createAccessoryManager({
+            THREE,
+            GLTFLoader,
+            getCharacter: () => selectedCharacter,
+            getModelRoot: () => loadedModelRoot,
+            isCameraActive: () => camera.isActive,
             drawScene
         });
 
@@ -298,15 +300,10 @@
         function drawScene() {
             if (canvas.width === 0 || (camera.isActive && video.videoWidth === 0)) return;
             
-            ctx.fillStyle = previewBackgroundColor;
+            ctx.fillStyle = previewBackgroundManager.color;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            drawPreviewBackground();
-            if (backgroundLightingMatch.checked
-                && previewBackground?.type === 'video'
-                && performance.now() - lastBackgroundLightingSample >= 500) {
-                update3DLightingFromBackground(previewBackground.element);
-                lastBackgroundLightingSample = performance.now();
-            }
+            previewBackgroundManager.draw();
+            previewBackgroundManager.updateVideoLighting();
             
             let cx = canvas.width / 2;
             let cy = canvas.height / 2;
@@ -423,18 +420,18 @@
             
             if (selectedCharacter in PALETTES && selectedCharacter !== 'custom') {
                 drawCharacterBase(ctx, selectedCharacter, selectedVariant, cx, cy, headRadius, yawX, pitchY);
-            } else if (selectedCharacter === 'custom' && customImageMasked) {
-                if (isCustomStatic) ctx.drawImage(customImageMasked, screenCenterX - customBgDrawW/2, screenCenterY - customBgDrawH/2, customBgDrawW, customBgDrawH);
+            } else if (selectedCharacter === 'custom' && customImageEditor?.maskedImage) {
+                if (isCustomStatic) ctx.drawImage(customImageEditor.maskedImage, screenCenterX - customBgDrawW/2, screenCenterY - customBgDrawH/2, customBgDrawW, customBgDrawH);
                 else {
                     const hx = cx + yawX * 0.2; const hy = cy + pitchY * 0.2;
-                    ctx.drawImage(customImageMasked, hx - customBgDrawW/2, hy - customBgDrawH/2, customBgDrawW, customBgDrawH);
+                    ctx.drawImage(customImageEditor.maskedImage, hx - customBgDrawW/2, hy - customBgDrawH/2, customBgDrawW, customBgDrawH);
                 }
             }
             ctx.restore();
 
             let rEyeTargetX, rEyeTargetY, lEyeTargetX, lEyeTargetY, mTargetX, mTargetY;
             
-            if (selectedCharacter === 'custom' && customImageMasked) {
+            if (selectedCharacter === 'custom' && customImageEditor?.maskedImage) {
                 const e1x = customSettings.e1x; const e1y = customSettings.e1y;
                 const e2x = customSettings.e2x; const e2y = customSettings.e2y;
                 const mx = customSettings.mx;   const my = customSettings.my;
@@ -519,167 +516,6 @@
             }
         }
 
-        function drawPreviewBackground() {
-            if (!previewBackground) return;
-            const source = previewBackground.element;
-            const sourceWidth = source.videoWidth || source.naturalWidth;
-            const sourceHeight = source.videoHeight || source.naturalHeight;
-            if (!sourceWidth || !sourceHeight) return;
-
-            const scale = Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight);
-            const width = sourceWidth * scale;
-            const height = sourceHeight * scale;
-            ctx.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
-        }
-
-        function reset3DLightingTint() {
-            modelAmbientLight?.color.set(0xffffff);
-            modelDirectionalLight?.color.set(0xffffff);
-        }
-
-        function update3DLightingFromBackground(source) {
-            if (!modelAmbientLight || !modelDirectionalLight) return;
-
-            const sourceWidth = source.videoWidth || source.naturalWidth;
-            const sourceHeight = source.videoHeight || source.naturalHeight;
-            if (!sourceWidth || !sourceHeight) return;
-
-            const scale = Math.max(
-                backgroundSampleCanvas.width / sourceWidth,
-                backgroundSampleCanvas.height / sourceHeight
-            );
-            const width = sourceWidth * scale;
-            const height = sourceHeight * scale;
-            try {
-                backgroundSampleContext.clearRect(0, 0, backgroundSampleCanvas.width, backgroundSampleCanvas.height);
-                backgroundSampleContext.drawImage(
-                    source,
-                    (backgroundSampleCanvas.width - width) / 2,
-                    (backgroundSampleCanvas.height - height) / 2,
-                    width,
-                    height
-                );
-
-                const { data } = backgroundSampleContext.getImageData(0, 0, backgroundSampleCanvas.width, backgroundSampleCanvas.height);
-                let red = 0;
-                let green = 0;
-                let blue = 0;
-                for (let index = 0; index < data.length; index += 4) {
-                    red += data[index];
-                    green += data[index + 1];
-                    blue += data[index + 2];
-                }
-                const count = data.length / 4;
-                averageBackgroundColor.setRGB(red / count / 255, green / count / 255, blue / count / 255, THREE.SRGBColorSpace);
-            } catch (error) {
-                console.error("Could not sample the preview background for 3D lighting:", error);
-                return;
-            }
-
-            const white = new THREE.Color(0xffffff);
-            modelAmbientLight.color.copy(white).lerp(averageBackgroundColor, 0.6);
-            modelDirectionalLight.color.copy(white).lerp(averageBackgroundColor, 0.45);
-        }
-
-        function setBackgroundStatus(message, isError = false) {
-            backgroundStatus.textContent = message;
-            backgroundStatus.className = `mt-2 truncate text-[10px] ${isError ? 'text-rose-600' : 'text-slate-500'}`;
-        }
-
-        function releasePreviewBackground() {
-            if (backgroundFrameRequest) {
-                cancelAnimationFrame(backgroundFrameRequest);
-                backgroundFrameRequest = 0;
-            }
-            if (previewBackground?.type === 'video') {
-                previewBackground.element.pause();
-                previewBackground.element.removeAttribute('src');
-                previewBackground.element.load();
-            }
-            previewBackground = null;
-            if (previewBackgroundUrl) {
-                URL.revokeObjectURL(previewBackgroundUrl);
-                previewBackgroundUrl = null;
-            }
-        }
-
-        function renderBackgroundVideo(token) {
-            if (token !== backgroundLoadToken || previewBackground?.type !== 'video') return;
-            if (camera.isActive) {
-                backgroundFrameRequest = 0;
-                return;
-            }
-            drawScene();
-            backgroundFrameRequest = requestAnimationFrame(() => renderBackgroundVideo(token));
-        }
-
-        function loadPreviewBackground(file) {
-            const token = ++backgroundLoadToken;
-            releasePreviewBackground();
-            reset3DLightingTint();
-            if (!file) {
-                backgroundFile.value = '';
-                clearBackgroundButton.disabled = true;
-                setBackgroundStatus("No background selected");
-                reset3DLightingTint();
-                drawScene();
-                return;
-            }
-
-            previewBackgroundUrl = URL.createObjectURL(file);
-            clearBackgroundButton.disabled = false;
-            setBackgroundStatus(`Loading ${file.name}...`);
-
-            let loadFailed = false;
-            const failLoad = (error) => {
-                if (token !== backgroundLoadToken || loadFailed) return;
-                loadFailed = true;
-                console.error("Could not load background media:", error);
-                releasePreviewBackground();
-                backgroundFile.value = '';
-                clearBackgroundButton.disabled = true;
-                setBackgroundStatus(`Could not load ${file.name}`, true);
-                reset3DLightingTint();
-                drawScene();
-            };
-
-            if (file.type.startsWith('image/')) {
-                const image = new Image();
-                previewBackground = { type: 'image', element: image };
-                image.onload = () => {
-                    if (token !== backgroundLoadToken) return;
-                    if (backgroundLightingMatch.checked) update3DLightingFromBackground(image);
-                    setBackgroundStatus(file.name);
-                    drawScene();
-                };
-                image.onerror = () => failLoad(new Error(`Unsupported or invalid image: ${file.name}`));
-                image.src = previewBackgroundUrl;
-                return;
-            }
-
-            if (file.type.startsWith('video/')) {
-                const backgroundVideo = document.createElement('video');
-                backgroundVideo.muted = true;
-                backgroundVideo.loop = true;
-                backgroundVideo.playsInline = true;
-                previewBackground = { type: 'video', element: backgroundVideo };
-                backgroundVideo.addEventListener('loadeddata', () => {
-                    if (token !== backgroundLoadToken) return;
-                    if (backgroundLightingMatch.checked) update3DLightingFromBackground(backgroundVideo);
-                    lastBackgroundLightingSample = performance.now();
-                    setBackgroundStatus(`${file.name} (looping)`);
-                    drawScene();
-                    if (!camera.isActive) renderBackgroundVideo(token);
-                }, { once: true });
-                backgroundVideo.addEventListener('error', () => failLoad(new Error(`Unsupported or invalid video: ${file.name}`)), { once: true });
-                backgroundVideo.src = previewBackgroundUrl;
-                backgroundVideo.play().catch(failLoad);
-                return;
-            }
-
-            failLoad(new Error(`Unsupported background file type: ${file.type || 'unknown'}`));
-        }
-
         function init3DCanvasRenderer() {
             if (model3DRenderer) return;
             const w = canvas.width || 512; const h = canvas.height || 512;
@@ -700,22 +536,19 @@
                 roomEnvironment.dispose();
                 pmremGenerator.dispose();
             }
-            modelAmbientLight = new THREE.AmbientLight(0xffffff, 1.2);
-            model3DScene.add(modelAmbientLight);
-            modelDirectionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            modelDirectionalLight.position.set(2, 4, 3);
-            model3DScene.add(modelDirectionalLight);
-            if (backgroundLightingMatch.checked && previewBackground) update3DLightingFromBackground(previewBackground.element);
-            else reset3DLightingTint();
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            model3DScene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(2, 4, 3);
+            model3DScene.add(directionalLight);
+            previewBackgroundManager.setLights(ambientLight, directionalLight);
         }
 
         function loadProceduralTest3DModel(openStudio = true) {
             init3DCanvasRenderer();
             reset3DFeatureOffsets();
-            accessoryRigReady = false;
-            loadedCoreCharacterId = null;
+            accessoryManager.resetRig();
             rigBonesByName = new Map();
-            clearMountedAccessories();
             while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
 
             const root = new THREE.Group(); root.name = "AvatarRoot";
@@ -774,13 +607,11 @@
         function loadTest3DModel(openStudio = true) {
             init3DCanvasRenderer();
             const loadToken = ++coreLoadToken;
-            accessoryRigReady = false;
-            loadedCoreCharacterId = null;
-            clearMountedAccessories();
+            accessoryManager.resetRig();
             const loader = new GLTFLoader();
             loader.load(new URL('models/core/character.glb', document.baseURI).href, (gltf) => {
                 if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) {
-                    disposeImportedModel(gltf.scene);
+                    accessoryManager.disposeModelResources(gltf.scene);
                     return;
                 }
                 initializeLoaded3DModel(gltf, openStudio, !openStudio, CORE_CHARACTER_ID);
@@ -789,14 +620,14 @@
                 console.error("Core character model failed to load:", error);
                 loadProceduralTest3DModel(openStudio);
                 if (selectedCharacter === CORE_CHARACTER_ID) {
-                    setAccessoryStatus("The core character rig could not be loaded; accessories are unavailable.");
+                    accessoryManager.setStatus("The core character rig could not be loaded; accessories are unavailable.");
                 }
             });
         }
 
         function initializeLoaded3DModel(gltf, openStudio = true, isCoreModel = false, characterId = null) {
             reset3DFeatureOffsets();
-            clearMountedAccessories();
+            accessoryManager.resetRig();
             while(model3DScene.children.length > 2) model3DScene.remove(model3DScene.children[2]);
             model3DScene.add(gltf.scene);
             loadedModelRoot = gltf.scene; loadedModelRoot.userData.baseY = 0;
@@ -841,8 +672,7 @@
             if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right');
             if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
 
-            loadedCoreCharacterId = isCoreModel ? characterId : null;
-            accessoryRigReady = isCoreModel && rigBonesByName.size > 0;
+            accessoryManager.setRig(loadedModelRoot, rigBonesByName, isCoreModel ? characterId : null);
             customSettings.is3D = true; customSettings.isStatic = false;
             if (openStudio) {
                 document.getElementById('custom-status').style.display = 'none';
@@ -854,278 +684,12 @@
             isPreviewing3D = openStudio;
             if (openStudio) render3DStudioPreview();
             else if (!camera.isActive) drawScene();
-            if (isCoreModel && selectedCharacter === characterId) applySelectedAccessories();
-        }
-
-        function setAccessoryStatus(message, isError = false) {
-            const status = document.getElementById('accessory-status');
-            status.textContent = message;
-            status.className = `mt-2 min-h-4 text-[10px] ${isError ? 'text-rose-600' : 'text-slate-500'}`;
-        }
-
-        function disposeImportedModel(root) {
-            if (!root) return;
-            const geometries = new Set();
-            const materials = new Set();
-            const skeletons = new Set();
-            root.traverse((child) => {
-                if (!child.isMesh) return;
-                if (child.geometry) geometries.add(child.geometry);
-                for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
-                    if (material) materials.add(material);
-                }
-                if (child.isSkinnedMesh && child.skeleton) skeletons.add(child.skeleton);
-            });
-            geometries.forEach(geometry => geometry.dispose());
-            materials.forEach(material => {
-                for (const value of Object.values(material)) {
-                    if (value?.isTexture) value.dispose();
-                }
-                material.dispose();
-            });
-            skeletons.forEach(skeleton => skeleton.dispose());
-        }
-
-        function disposeMountedAccessory(accessory) {
-            if (!accessory) return;
-            const geometries = new Set();
-            const materials = new Set();
-            accessory.meshes.forEach(mesh => {
-                if (mesh.parent) mesh.parent.remove(mesh);
-                if (mesh.geometry) geometries.add(mesh.geometry);
-                for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-                    if (material) materials.add(material);
-                }
-            });
-            geometries.forEach(geometry => geometry.dispose());
-            materials.forEach(material => {
-                for (const value of Object.values(material)) {
-                    if (value?.isTexture) value.dispose();
-                }
-                material.dispose();
-            });
-            accessory.skeletons.forEach(skeleton => skeleton.dispose());
-        }
-
-        function clearMountedAccessories() {
-            for (const slot of new Set([...accessoryLoadTokens.keys(), ...mountedAccessories.keys()])) {
-                accessoryLoadTokens.set(slot, (accessoryLoadTokens.get(slot) || 0) + 1);
-                disposeMountedAccessory(mountedAccessories.get(slot));
-                mountedAccessories.delete(slot);
-            }
-            setAccessoryStatus("");
-        }
-
-        function mountAccessory(accessory, gltf) {
-            if (!loadedModelRoot || !accessoryRigReady) {
-                throw new Error("Load the 3D core character before adding accessories.");
-            }
-
-            const accessoryRoot = gltf.scene;
-            accessoryRoot.updateMatrixWorld(true);
-            loadedModelRoot.updateMatrixWorld(true);
-            const meshes = [];
-            accessoryRoot.traverse(child => {
-                if (child.isMesh) meshes.push(child);
-            });
-            if (meshes.length === 0) throw new Error("The selected accessory contains no meshes.");
-
-            const remappings = meshes.filter(mesh => mesh.isSkinnedMesh).map(mesh => {
-                if (!mesh.skeleton) throw new Error(`Skinned mesh "${mesh.name}" has no skeleton.`);
-                const mappedBones = mesh.skeleton.bones.map(accessoryBone => {
-                    const boneName = accessoryBone.name?.trim().toLowerCase();
-                    const mappedBone = boneName ? rigBonesByName.get(boneName) : null;
-                    if (!mappedBone) {
-                        throw new Error(boneName
-                            ? `Core rig is missing accessory bone "${accessoryBone.name}".`
-                            : "The accessory skeleton contains an unnamed bone.");
-                    }
-                    return mappedBone;
-                });
-                return { mesh, skeleton: new THREE.Skeleton(mappedBones, mesh.skeleton.boneInverses) };
-            });
-
-            const skeletons = [];
-            remappings.forEach(({ mesh, skeleton }) => {
-                mesh.bind(skeleton, mesh.bindMatrix);
-                mesh.frustumCulled = false;
-                skeletons.push(skeleton);
-            });
-            meshes.forEach(mesh => loadedModelRoot.attach(mesh));
-            accessoryRoot.clear();
-            return { id: accessory.id, meshes, skeletons };
-        }
-
-        function changeAccessory(slot, accessoryId) {
-            const requestToken = (accessoryLoadTokens.get(slot) || 0) + 1;
-            accessoryLoadTokens.set(slot, requestToken);
-            const accessory = accessoryCatalog?.accessories.find(item => item.id === accessoryId);
-            if (!accessoryId) {
-                disposeMountedAccessory(mountedAccessories.get(slot));
-                mountedAccessories.delete(slot);
-                selectedAccessoryIds.delete(slot);
-                setAccessoryStatus("");
-                return;
-            }
-
-            if (!accessory || accessory.slot !== slot || !accessory.compatibleCharacters.includes(selectedCharacter)) {
-                selectedAccessoryIds.delete(slot);
-                setAccessoryStatus("This accessory is not compatible with the selected character.", true);
-                return;
-            }
-            selectedAccessoryIds.set(slot, accessoryId);
-            if (!accessoryRigReady || !loadedModelRoot || loadedCoreCharacterId !== selectedCharacter) {
-                setAccessoryStatus("Loading the core character...");
-                return;
-            }
-            if (mountedAccessories.get(slot)?.id === accessoryId) {
-                setAccessoryStatus("");
-                return;
-            }
-
-            new GLTFLoader().load(new URL(accessory.model, document.baseURI).href, (gltf) => {
-                if (requestToken !== accessoryLoadTokens.get(slot)
-                    || selectedAccessoryIds.get(slot) !== accessoryId
-                    || selectedCharacter !== loadedCoreCharacterId
-                    || !accessoryRigReady) {
-                    disposeImportedModel(gltf.scene);
-                    return;
-                }
-                try {
-                    const mounted = mountAccessory(accessory, gltf);
-                    disposeMountedAccessory(mountedAccessories.get(slot));
-                    mountedAccessories.set(slot, mounted);
-                    setAccessoryStatus("");
-                    if (!camera.isActive) drawScene();
-                } catch (error) {
-                    disposeImportedModel(gltf.scene);
-                    console.error(`Could not attach accessory "${accessory.id}":`, error);
-                    selectedAccessoryIds.delete(slot);
-                    rebuildAccessorySelectors();
-                    setAccessoryStatus(`Could not attach accessory: ${error.message}`, true);
-                }
-            }, undefined, (error) => {
-                if (requestToken !== accessoryLoadTokens.get(slot)) return;
-                console.error(`Could not load accessory "${accessory.id}":`, error);
-                selectedAccessoryIds.delete(slot);
-                rebuildAccessorySelectors();
-                setAccessoryStatus(`Could not load accessory: ${accessory.name}`, true);
-            });
-        }
-
-        function applySelectedAccessories() {
-            for (const [slot, accessoryId] of selectedAccessoryIds) {
-                changeAccessory(slot, accessoryId);
-            }
-        }
-
-        function rebuildAccessorySelectors() {
-            const container = document.getElementById('accessory-selectors');
-            container.replaceChildren();
-            if (!accessoryCatalog) return;
-
-            const slots = [...new Set(accessoryCatalog.accessories.map(accessory => accessory.slot))].sort();
-            for (const slot of slots) {
-                const compatibleAccessories = accessoryCatalog.accessories
-                    .filter(accessory => accessory.slot === slot && accessory.compatibleCharacters.includes(selectedCharacter));
-                const label = document.createElement('label');
-                label.className = 'text-[10px] font-bold text-slate-500';
-                label.textContent = slot.replace(/[-_]/g, ' ').toUpperCase();
-
-                const select = document.createElement('select');
-                select.id = `select-accessory-${slot}`;
-                select.className = 'mt-1 w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-2 text-xs font-medium text-slate-600';
-                select.setAttribute('aria-label', `${slot} accessory`);
-                const noneOption = document.createElement('option');
-                noneOption.value = '';
-                noneOption.textContent = 'None';
-                select.append(noneOption);
-
-                compatibleAccessories.forEach(accessory => {
-                    const option = document.createElement('option');
-                    option.value = accessory.id;
-                    option.textContent = accessory.name;
-                    select.append(option);
-                });
-
-                const selectedId = selectedAccessoryIds.get(slot);
-                if (selectedId && compatibleAccessories.some(accessory => accessory.id === selectedId)) {
-                    select.value = selectedId;
-                } else {
-                    selectedAccessoryIds.delete(slot);
-                    disposeMountedAccessory(mountedAccessories.get(slot));
-                    mountedAccessories.delete(slot);
-                    accessoryLoadTokens.set(slot, (accessoryLoadTokens.get(slot) || 0) + 1);
-                }
-                select.addEventListener('change', () => changeAccessory(slot, select.value));
-                label.append(select);
-                container.append(label);
-            }
-
-            if (!slots.length) {
-                setAccessoryStatus("No accessories are defined in models/accessories.json.");
-            } else if (!accessoryCatalog.characters.some(character => character.id === selectedCharacter)) {
-                setAccessoryStatus(`No accessories are configured for "${selectedCharacter}".`);
-            } else if (!accessoryCatalog.accessories.some(accessory => accessory.compatibleCharacters.includes(selectedCharacter))) {
-                const character = accessoryCatalog.characters.find(item => item.id === selectedCharacter);
-                setAccessoryStatus(`No accessories are configured for ${character.name}.`);
-            } else {
-                setAccessoryStatus("");
-            }
-        }
-
-        function validateAccessoryCatalog(data) {
-            if (!data || !Array.isArray(data.characters) || !Array.isArray(data.accessories)) {
-                throw new Error("Catalog must contain characters and accessories arrays.");
-            }
-            const characterIds = new Set();
-            for (const character of data.characters) {
-                if (!character || typeof character.id !== 'string' || !character.id.trim()
-                    || typeof character.name !== 'string' || !character.name.trim()
-                    || characterIds.has(character.id)) {
-                    throw new Error("Each character needs a unique id and a name.");
-                }
-                characterIds.add(character.id);
-            }
-
-            const accessoryIds = new Set();
-            for (const accessory of data.accessories) {
-                if (!accessory || typeof accessory.id !== 'string' || !accessory.id.trim()
-                    || accessoryIds.has(accessory.id)
-                    || typeof accessory.name !== 'string' || !accessory.name.trim()
-                    || typeof accessory.slot !== 'string' || !/^[a-z][a-z0-9_-]*$/i.test(accessory.slot)
-                    || typeof accessory.model !== 'string' || !accessory.model.trim()
-                    || !Array.isArray(accessory.compatibleCharacters)
-                    || accessory.compatibleCharacters.length === 0) {
-                    throw new Error("Each accessory needs a unique id, name, slot, model path, and compatibleCharacters list.");
-                }
-                if (accessory.compatibleCharacters.some(id => !characterIds.has(id))) {
-                    throw new Error(`Accessory "${accessory.id}" references a character missing from the characters list.`);
-                }
-                accessoryIds.add(accessory.id);
-            }
-            return data;
-        }
-
-        async function loadAccessoryCatalog() {
-            setAccessoryStatus("Loading accessory catalog...");
-            try {
-                const response = await fetch(new URL('models/accessories.json', document.baseURI));
-                if (!response.ok) throw new Error(`Catalog request failed with HTTP ${response.status}.`);
-                accessoryCatalog = validateAccessoryCatalog(await response.json());
-                rebuildAccessorySelectors();
-            } catch (error) {
-                console.error("Could not load accessory catalog:", error);
-                setAccessoryStatus(`Accessory catalog error: ${error.message}`, true);
-            }
         }
 
         function load3DModelFile(file) {
             init3DCanvasRenderer();
             coreLoadToken++;
-            accessoryRigReady = false;
-            loadedCoreCharacterId = null;
-            clearMountedAccessories();
+            accessoryManager.resetRig();
             const reader = new FileReader();
             reader.onload = (e) => {
                 const loader = new GLTFLoader();
@@ -1289,12 +853,10 @@
         function updateCharacterSelection(activeChar) {
             if (activeChar !== selectedCharacter) {
                 coreLoadToken++;
-                accessoryRigReady = false;
-                loadedCoreCharacterId = null;
-                clearMountedAccessories();
+                accessoryManager.resetRig();
             }
             selectedCharacter = activeChar;
-            rebuildAccessorySelectors();
+            accessoryManager.rebuildSelectors();
             [btnBear, btnCat, btnMoose, btnDog, btnBird, btnPenguin, btnCowboy, btnCustomTrig].forEach(btn => {
                 if (btn.id === 'btn-custom-trigger') btn.className = 'w-full bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100';
                 else btn.className = 'bg-slate-100 text-slate-500 rounded-2xl p-2.5 flex flex-col items-center border-2 border-transparent transition active:scale-95';
@@ -1330,21 +892,6 @@
         sliderEyes.addEventListener('input', (e) => { eyeScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
         sliderNose.addEventListener('input', (e) => { noseScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
         sliderMouth.addEventListener('input', (e) => { mouthScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
-        backgroundFile.addEventListener('change', () => loadPreviewBackground(backgroundFile.files[0]));
-        clearBackgroundButton.addEventListener('click', () => loadPreviewBackground(null));
-        backgroundColor.addEventListener('input', () => {
-            previewBackgroundColor = backgroundColor.value;
-            drawScene();
-        });
-        backgroundLightingMatch.addEventListener('change', () => {
-            if (backgroundLightingMatch.checked && previewBackground) {
-                update3DLightingFromBackground(previewBackground.element);
-            } else {
-                reset3DLightingTint();
-            }
-            drawScene();
-        });
-
         btnRecenter.addEventListener('click', () => { requestRecenter = true; });
 
         btnTogglePip.addEventListener('click', () => {
@@ -1359,22 +906,12 @@
         });
 
         const modalCustom = document.getElementById('modal-custom');
-        const customImageInput = document.getElementById('custom-image-file');
         const custom3DInput = document.getElementById('custom-3d-file');
         const customPreviewCanvas = document.getElementById('custom-preview-canvas');
         const customStatus = document.getElementById('custom-status');
         const customControls = document.getElementById('custom-controls');
         
         const cStatic = document.getElementById('c-static');
-        const cUseMask = document.getElementById('c-use-mask');
-        const panelMask = document.getElementById('panel-mask');
-        const panelScale = document.getElementById('panel-scale');
-
-        const cExpand = document.getElementById('c-expand'); const cFeather = document.getElementById('c-feather');
-        const cScale = document.getElementById('c-scale'); const cPanX = document.getElementById('c-pan-x'); const cPanY = document.getElementById('c-pan-y');
-        const cE1X = document.getElementById('c-e1x'); const cE1Y = document.getElementById('c-e1y');
-        const cE2X = document.getElementById('c-e2x'); const cE2Y = document.getElementById('c-e2y');
-        const cMX = document.getElementById('c-mx');   const cMY = document.getElementById('c-my');
         
         const c3dCamZ = document.getElementById('c3d-cam-z'); const c3dCamY = document.getElementById('c3d-cam-y');
         const c3dModelScale = document.getElementById('c3d-model-scale');
@@ -1392,7 +929,11 @@
 
         const btnCustomCancel = document.getElementById('btn-custom-cancel'); const btnCustomSave = document.getElementById('btn-custom-save');
         const guides = [document.getElementById('guide-e1'), document.getElementById('guide-e2'), document.getElementById('guide-mouth')];
-        const magnifier = document.getElementById('magnifier'); const magnifierCanvas = document.getElementById('magnifier-canvas'); const magnifierCtx = magnifierCanvas.getContext('2d');
+        customImageEditor = createCustomCharacterEditor({
+            camera,
+            customSettings,
+            onImageLoaded: () => { isPreviewing3D = false; }
+        });
 
         btnCustomTrig.addEventListener('click', () => {
             modalCustom.classList.remove('hidden'); modalCustom.classList.add('flex');
@@ -1402,12 +943,12 @@
                 guides.forEach(g => g.classList.add('hidden'));
                 btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
                 isPreviewing3D = true; render3DStudioPreview();
-            } else if(customImageMasked) {
+            } else if (customImageEditor.maskedImage) {
                 customControls.classList.remove('hidden'); customControls.classList.add('flex');
                 panel3dAdjust.classList.add('hidden'); panel3dAdjust.classList.remove('flex');
                 guides.forEach(g => g.classList.remove('hidden'));
                 btnCustomSave.classList.remove('opacity-50', 'pointer-events-none');
-                updateCustomPreview();
+                customImageEditor.updatePreview();
             } else {
                 customStatus.style.display = 'block';
                 customControls.classList.add('hidden'); customControls.classList.remove('flex');
@@ -1419,125 +960,10 @@
 
         custom3DInput.addEventListener('change', async (e) => { if (!e.target.files[0]) return; load3DModelFile(e.target.files[0]); e.target.value = ''; });
 
-        customImageInput.addEventListener('change', async (e) => {
-            if (!e.target.files[0]) return;
-            const reader = new FileReader();
-            customStatus.style.display = 'block'; customStatus.textContent = "Detecting Face Layout...";
-            customControls.classList.add('hidden'); customControls.classList.remove('flex');
-            btnCustomSave.classList.add('opacity-50', 'pointer-events-none'); guides.forEach(g => g.classList.add('hidden'));
-
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = async () => {
-                    const MAX_SIZE = 800; let sw = img.width; let sh = img.height;
-                    if (sw > MAX_SIZE || sh > MAX_SIZE) { const ratio = Math.min(MAX_SIZE / sw, MAX_SIZE / sh); sw = Math.round(sw * ratio); sh = Math.round(sh * ratio); }
-                    const workCanvas = document.createElement('canvas'); workCanvas.width = sw; workCanvas.height = sh; const workCtx = workCanvas.getContext('2d'); workCtx.drawImage(img, 0, 0, sw, sh);
-                    let results = { faceLandmarks: [] }; if (camera.imageLandmarker) results = camera.imageLandmarker.detect(workCanvas);
-                    customBaseImage = workCanvas;
-                    if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-                        customFaceLandmarks = results.faceLandmarks[0]; customStatus.style.display = 'none';
-                        cUseMask.checked = true; cUseMask.disabled = false; document.getElementById('label-use-mask').classList.remove('opacity-50');
-                        panelMask.classList.remove('hidden'); panelScale.classList.add('hidden');
-                    } else {
-                        customFaceLandmarks = null; customStatus.textContent = "Manual placement mode activated."; setTimeout(() => { customStatus.style.display = 'none'; }, 2000);
-                        cUseMask.checked = false; cUseMask.disabled = true; document.getElementById('label-use-mask').classList.add('opacity-50');
-                        panelMask.classList.add('hidden'); panelScale.classList.remove('hidden');
-                    }
-                    customControls.classList.remove('hidden'); customControls.classList.add('flex');
-                    btnCustomSave.classList.remove('opacity-50', 'pointer-events-none'); guides.forEach(g => g.classList.remove('hidden'));
-                    customSettings.is3D = false; generateCustomImage(!!customFaceLandmarks); 
-                    panel3dAdjust.classList.add('hidden'); panel3dAdjust.classList.remove('flex'); isPreviewing3D = false;
-                }; img.src = event.target.result;
-            }; reader.readAsDataURL(e.target.files[0]); e.target.value = '';
-        });
-
-        cUseMask.addEventListener('change', () => {
-            if(cUseMask.checked && !customFaceLandmarks) { cUseMask.checked = false; return; }
-            if(cUseMask.checked) { panelMask.classList.remove('hidden'); panelScale.classList.add('hidden'); } else { panelMask.classList.add('hidden'); panelScale.classList.remove('hidden'); }
-            generateCustomImage(true);
-        });
-
-        [cExpand, cFeather, cScale, cPanX, cPanY].forEach(el => el.addEventListener('input', () => generateCustomImage(false)));
-        [cE1X, cE1Y, cE2X, cE2Y, cMX, cMY].forEach(el => el.addEventListener('input', updateCustomPreview));
         Object.values(c3dFeatureOffsets).flat().forEach(el => el.addEventListener('input', render3DStudioPreview));
         [c3dCurveHorizontal, c3dCurveVertical].forEach(slider => slider.addEventListener('input', () => {
             Object.values(livePlanes).forEach(updateLivePlaneCurvature);
         }));
-
-        function generateCustomImage(autoAlign = false) {
-            if (!customBaseImage) return;
-            const size = 512; const outCanvas = document.createElement('canvas'); outCanvas.width = size; outCanvas.height = size; const ctxC = outCanvas.getContext('2d');
-            const useMask = cUseMask.checked; const sw = customBaseImage.width; const sh = customBaseImage.height;
-            let transform = { offsetX: 0, offsetY: 0, scale: 1 };
-
-            if (useMask && customFaceLandmarks) {
-                const expand = parseFloat(cExpand.value); const feather = parseFloat(cFeather.value);
-                let minX = 1, maxX = 0, minY = 1, maxY = 0;
-                FACE_OVAL_CONTOUR.forEach(idx => { const pt = customFaceLandmarks[idx]; if(pt.x < minX) minX = pt.x; if(pt.x > maxX) maxX = pt.x; if(pt.y < minY) minY = pt.y; if(pt.y > maxY) maxY = pt.y; });
-                const cx = (minX + maxX) / 2; const cy = (minY + maxY) / 2;
-                const expandedW = (maxX - minX) * sw * expand; const expandedH = (maxY - minY) * sh * expand;
-                const pad = feather * 2; const neededSize = Math.max(expandedW, expandedH) + pad * 2;
-                transform.scale = size / neededSize; transform.offsetX = size/2 - (cx * sw * transform.scale); transform.offsetY = size/2 - (cy * sh * transform.scale);
-
-                ctxC.fillStyle = '#ffffff'; if (feather > 0) ctxC.filter = `blur(${feather}px)`; ctxC.beginPath();
-                FACE_OVAL_CONTOUR.forEach((idx, i) => {
-                    const pt = customFaceLandmarks[idx]; const canvasX = transform.offsetX + ((cx + (pt.x - cx) * expand) * sw * transform.scale); const canvasY = transform.offsetY + ((cy + (pt.y - cy) * expand) * sh * transform.scale);
-                    if (i === 0) ctxC.moveTo(canvasX, canvasY); else ctxC.lineTo(canvasX, canvasY);
-                }); ctxC.closePath(); ctxC.fill();
-                ctxC.filter = 'none'; ctxC.globalCompositeOperation = 'source-in';
-            } else {
-                const scale = parseFloat(cScale.value); const panX = parseFloat(cPanX.value) * size; const panY = parseFloat(cPanY.value) * size;
-                transform.scale = (size / Math.max(sw, sh)) * scale; transform.offsetX = (size/2 + panX) - (sw/2 * transform.scale); transform.offsetY = (size/2 + panY) - (sh/2 * transform.scale);
-            }
-
-            ctxC.translate(transform.offsetX, transform.offsetY); ctxC.scale(transform.scale, transform.scale); ctxC.drawImage(customBaseImage, 0, 0);
-
-            if (autoAlign && customFaceLandmarks) {
-                const getNorm = (pt) => ({ x: (transform.offsetX + (pt.x * sw * transform.scale)) / size, y: (transform.offsetY + (pt.y * sh * transform.scale)) / size });
-                const e1 = getNorm(customFaceLandmarks[33]); const e2 = getNorm(customFaceLandmarks[263]); const m = getNorm(customFaceLandmarks[13]);
-                cE1X.value = e1.x; cE1Y.value = e1.y; cE2X.value = e2.x; cE2Y.value = e2.y; cMX.value = m.x; cMY.value = m.y;
-            } else if (!autoAlign && !customFaceLandmarks) { cE1X.value = 0.35; cE1Y.value = 0.4; cE2X.value = 0.65; cE2Y.value = 0.4; cMX.value = 0.5; cMY.value = 0.7; }
-
-            const img = new Image(); img.onload = () => { customImageMasked = img; updateCustomPreview(); }; img.src = outCanvas.toDataURL('image/png');
-        }
-
-        function updateCustomPreview() {
-            if(!customImageMasked) return;
-            const cvs = customPreviewCanvas; const ctxC = cvs.getContext('2d'); const w = cvs.width = cvs.offsetWidth; const h = cvs.height = cvs.offsetHeight;
-            ctxC.clearRect(0,0,w,h); ctxC.drawImage(customImageMasked, 0, 0, w, h);
-            document.getElementById('guide-e1').style.left = `${parseFloat(cE1X.value) * 100}%`; document.getElementById('guide-e1').style.top = `${parseFloat(cE1Y.value) * 100}%`;
-            document.getElementById('guide-e2').style.left = `${parseFloat(cE2X.value) * 100}%`; document.getElementById('guide-e2').style.top = `${parseFloat(cE2Y.value) * 100}%`;
-            document.getElementById('guide-mouth').style.left = `${parseFloat(cMX.value) * 100}%`; document.getElementById('guide-mouth').style.top = `${parseFloat(cMY.value) * 100}%`;
-        }
-
-        let draggedGuide = null;
-        const dotMapping = { 'guide-e1': { x: cE1X, y: cE1Y }, 'guide-e2': { x: cE2X, y: cE2Y }, 'guide-mouth': { x: cMX, y: cMY } };
-        const previewContainer = document.getElementById('custom-preview-container');
-
-        function startDrag(e) {
-            e.preventDefault(); draggedGuide = e.target; magnifier.classList.remove('hidden');
-            document.addEventListener('mousemove', drag); document.addEventListener('touchmove', drag, {passive: false});
-            document.addEventListener('mouseup', endDrag); document.addEventListener('touchend', endDrag);
-        }
-
-        function drag(e) {
-            if(!draggedGuide) return; e.preventDefault(); const rect = previewContainer.getBoundingClientRect();
-            let clientX = e.touches ? e.touches[0].clientX : e.clientX; let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            let normX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)); let normY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-            const mapped = dotMapping[draggedGuide.id];
-            if(mapped) { mapped.x.value = normX; mapped.y.value = normY; updateCustomPreview(); updateMagnifier(clientX, clientY, rect); }
-        }
-
-        function updateMagnifier(clientX, clientY, rect) {
-            if(!customImageMasked) return;
-            const mw = magnifierCanvas.width = 112; const mh = magnifierCanvas.height = 112; magnifierCtx.clearRect(0,0,mw,mh); magnifierCtx.save(); magnifierCtx.imageSmoothingEnabled = false; 
-            const targetX = clientX - rect.left; const targetY = clientY - rect.top; const srcSize = mw / 5.0;
-            magnifierCtx.drawImage(customPreviewCanvas, (targetX - srcSize/2) * (customPreviewCanvas.width/rect.width), (targetY - srcSize/2) * (customPreviewCanvas.height/rect.height), srcSize * (customPreviewCanvas.width/rect.width), srcSize * (customPreviewCanvas.height/rect.height), 0, 0, mw, mh);
-            magnifierCtx.restore();
-            let magLeft = targetX + 20; let magTop = targetY - 120;
-            if(magLeft + 112 > rect.width) magLeft = targetX - 132; if(magTop < 0) magTop = targetY + 20;
-            magnifier.style.left = `${magLeft}px`; magnifier.style.top = `${magTop}px`;
-        }
 
         function render3DStudioPreview() {
             if (!isPreviewing3D || !model3DRenderer || !model3DScene || !model3DCamera) return;
@@ -1603,9 +1029,11 @@
         btnResetOrbit.addEventListener('click', () => { orbitAngleX = 0; orbitAngleY = 0; });
 
         btnCustomSave.addEventListener('click', () => {
-            customSettings.e1x = parseFloat(cE1X.value); customSettings.e1y = parseFloat(cE1Y.value);
-            customSettings.e2x = parseFloat(cE2X.value); customSettings.e2y = parseFloat(cE2Y.value);
-            customSettings.mx = parseFloat(cMX.value); customSettings.my = parseFloat(cMY.value); customSettings.isStatic = cStatic.checked;
+            const featureInputs = customImageEditor.featureInputs;
+            customSettings.e1x = parseFloat(featureInputs.leftEyeX.value); customSettings.e1y = parseFloat(featureInputs.leftEyeY.value);
+            customSettings.e2x = parseFloat(featureInputs.rightEyeX.value); customSettings.e2y = parseFloat(featureInputs.rightEyeY.value);
+            customSettings.mx = parseFloat(featureInputs.mouthX.value); customSettings.my = parseFloat(featureInputs.mouthY.value);
+            customSettings.isStatic = cStatic.checked;
             
             if (customSettings.is3D && model3DCamera) {
                 model3DCamera.position.z = parseFloat(c3dCamZ.value); model3DCamera.position.y = parseFloat(c3dCamY.value); model3DCamera.lookAt(0, model3DCamera.position.y, 0);
@@ -1621,7 +1049,7 @@
         setupRecording({ canvas, getAudioStream: () => camera.audioStream, isCameraActive: () => camera.isActive, setStatus });
 
         fullscreen = setupFullscreen({ resizeCanvases });
-        loadAccessoryCatalog();
+        accessoryManager.loadCatalog();
 
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && camera.isActive) { if (video.paused) video.play().catch(()=>{}); if (pipVideo.paused) pipVideo.play().catch(()=>{}); } });
 
