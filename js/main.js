@@ -1065,7 +1065,7 @@
         function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScale) {
             if (!modelBones.head) return;
             
-            const targetYaw = yaw / 200; const targetPitch = (pitch / 100) * pitchAxisScale; const targetRoll = roll;
+            const targetYaw = yaw / 150; const targetPitch = (pitch / 100) * pitchAxisScale; const targetRoll = roll;
             const now = performance.now();
             const smoothedYaw = smoothHeadRotation(headRotationFilters.yaw, targetYaw, now);
             const smoothedPitch = smoothHeadRotation(headRotationFilters.pitch, targetPitch, now);
