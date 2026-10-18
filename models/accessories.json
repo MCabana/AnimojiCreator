@@ -3,6 +3,10 @@
     {
       "id": "standard",
       "name": "Standard"
+    },
+    {
+      "id": "uncle",
+      "name": "Uncle"
     }
   ],
   "accessories": [
@@ -11,35 +15,35 @@
       "name": "Cowboy Hat",
       "slot": "hat",
       "model": "models/attachments/hats/cowboyHat.glb",
-      "compatibleCharacters": ["standard"]
+      "compatibleCharacters": ["standard","uncle"]
     },
     {
       "id": "firefighter-helmet",
       "name": "Firefighter Helmet",
       "slot": "hat",
       "model": "models/attachments/hats/firefighterHelmet.glb",
-      "compatibleCharacters": ["standard"]
+      "compatibleCharacters": ["standard","uncle"]
     },
     {
       "id": "cowboy-shirt",
       "name": "Cowboy Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/cowboyShirt.glb",
-      "compatibleCharacters": ["standard"]
+      "compatibleCharacters": ["standard","uncle"]
     },
     {
       "id": "officer-shirt",
       "name": "Officer Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/officerShirt.glb",
-      "compatibleCharacters": ["standard"]
+      "compatibleCharacters": ["standard","uncle"]
     },
     {
       "id": "firefighter-shirt",
       "name": "Firefighter Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/firefighterShirt.glb",
-      "compatibleCharacters": ["standard"]
+      "compatibleCharacters": ["standard","uncle"]
     }
     ,
     {

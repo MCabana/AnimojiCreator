@@ -39,7 +39,12 @@
         const btnRecenter = document.getElementById('btn-recenter');
 
         const CORE_CHARACTER_ID = 'standard';
-        let selectedCharacter = 'bear'; 
+        const THREE_D_CHARACTER_IDS = new Set();
+        const threeDCharacterButtons = new Map();
+        let threeDCharacterCatalog = [];
+        const characterButtons3DContainer = document.getElementById('character-buttons-3d');
+        const characterCatalogStatus = document.getElementById('character-catalog-status');
+        let selectedCharacter = 'bear';
         let selectedVariant = 0;
         const savedVariants = { bear: 0, cat: 0, moose: 0, dog: 0, bird: 0, penguin: 0, [CORE_CHARACTER_ID]: 0, custom: 0 };
         
@@ -534,7 +539,7 @@
                 drawPIPVisualizer(landmarks);
             } else { drawPIPVisualizer(null); }
 
-            if ((selectedCharacter === 'custom' || selectedCharacter === CORE_CHARACTER_ID) && customSettings.is3D && model3DEngine) {
+            if ((selectedCharacter === 'custom' || THREE_D_CHARACTER_IDS.has(selectedCharacter)) && customSettings.is3D && model3DEngine) {
                 const activeCx = isCustomStatic ? screenCenterX : cx;
                 const activeCy = isCustomStatic ? screenCenterY : cy;
                 const trackedRoll = update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy, pitchAxisScale);
@@ -629,7 +634,7 @@
             const lEyePos = getRotatedPos(lEyeTargetX, lEyeTargetY, false, true);
             const mouthPos = getRotatedPos(mTargetX, mTargetY, true, false); 
 
-            if (selectedCharacter !== 'custom' && selectedCharacter !== CORE_CHARACTER_ID) {
+            if (selectedCharacter !== 'custom' && !THREE_D_CHARACTER_IDS.has(selectedCharacter)) {
                 ctx.save();
                 ctx.translate(cx, cy);
                 ctx.rotate(angle);
@@ -662,7 +667,7 @@
                 drawAlignedCutout(landmarks, MOUTH_CONTOUR, mouthPos.x, mouthPos.y, finalMouthScale, mouthDrawAngle, skinColor, null, 1.0);
             }
             
-            if (selectedCharacter !== 'custom' && selectedCharacter !== CORE_CHARACTER_ID && selectedCharacter !== 'bird' && selectedCharacter !== 'penguin') {
+            if (selectedCharacter !== 'custom' && !THREE_D_CHARACTER_IDS.has(selectedCharacter) && selectedCharacter !== 'bird' && selectedCharacter !== 'penguin') {
                 ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle); ctx.translate(-cx, -cy);
                 ctx.fillStyle = '#000';
                 if (selectedCharacter === 'cat') {
@@ -814,27 +819,36 @@
             else if (!camera.isActive) drawScene();
         }
 
-        function loadTest3DModel(openStudio = true) {
+        function load3DCharacter(characterId = CORE_CHARACTER_ID, openStudio = true) {
+            const character = threeDCharacterCatalog.find(item => item.id === characterId);
+            if (!character) {
+                const error = new Error(`3D character "${characterId}" is not configured in models/characters.json.`);
+                console.error("Could not load 3D character:", error);
+                characterCatalogStatus.textContent = error.message;
+                characterCatalogStatus.classList.add('text-rose-600');
+                return;
+            }
+
             init3DCanvasRenderer();
             const loadToken = ++coreLoadToken;
             accessoryManager.resetRig();
-            loadAssetContainer('models/core/character.glb').then(assetContainer => {
-                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) {
+            loadAssetContainer(character.model).then(assetContainer => {
+                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== characterId)) {
                     accessoryManager.disposeModelResources(assetContainer);
                     return;
                 }
-                initializeLoaded3DModel(assetContainer, openStudio, !openStudio, CORE_CHARACTER_ID);
+                initializeLoaded3DModel(assetContainer, openStudio, characterId);
             }).catch(error => {
-                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== CORE_CHARACTER_ID)) return;
-                console.error("Core character model failed to load:", error);
+                if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== characterId)) return;
+                console.error(`3D character model "${characterId}" failed to load:`, error);
                 loadProceduralTest3DModel(openStudio);
-                if (selectedCharacter === CORE_CHARACTER_ID) {
-                    accessoryManager.setStatus("The core character rig could not be loaded; accessories are unavailable.");
+                if (selectedCharacter === characterId) {
+                    accessoryManager.setStatus(`The ${characterId} model could not be loaded; using the procedural test model.`, true);
                 }
             });
         }
 
-        function initializeLoaded3DModel(assetContainer, openStudio = true, isCoreModel = false, characterId = null) {
+        function initializeLoaded3DModel(assetContainer, openStudio = true, characterId = null) {
             reset3DFeatureOffsets();
             accessoryManager.resetRig();
             clearLoaded3DModel();
@@ -915,7 +929,7 @@
             if(modelBones.eye_right) createLivePlane(modelBones.eye_right, 'eye_right');
             if(modelBones.mouth) createLivePlane(modelBones.mouth, 'mouth');
 
-            accessoryManager.setRig(loadedModelRoot, rigBonesByName, isCoreModel ? characterId : null);
+            accessoryManager.setRig(loadedModelRoot, rigBonesByName, characterId);
             customSettings.is3D = true; customSettings.isStatic = false;
             if (openStudio) {
                 document.getElementById('custom-status').style.display = 'none';
@@ -934,7 +948,7 @@
             coreLoadToken++;
             accessoryManager.resetRig();
             BABYLON.SceneLoader.LoadAssetContainerAsync("", file, model3DScene).then(assetContainer => {
-                initializeLoaded3DModel(assetContainer, true, false);
+                initializeLoaded3DModel(assetContainer, true);
             }).catch(error => {
                 console.error("Could not load custom 3D model:", error);
                 alert('Could not parse GLB/GLTF model.');
@@ -1080,7 +1094,6 @@
         const btnDog = document.getElementById('btn-dog');
         const btnBird = document.getElementById('btn-bird');
         const btnPenguin = document.getElementById('btn-penguin');
-        const btnCowboy = document.getElementById('btn-cowboy');
         const btnCharacterMode2D = document.getElementById('btn-character-mode-2d');
         const btnCharacterMode3D = document.getElementById('btn-character-mode-3d');
         const characterList2D = document.getElementById('character-list-2d');
@@ -1113,7 +1126,7 @@
             }
             selectedCharacter = activeChar;
             accessoryManager.rebuildSelectors();
-            [btnBear, btnCat, btnMoose, btnDog, btnBird, btnPenguin, btnCowboy, btnCustomTrig].forEach(btn => {
+            [btnBear, btnCat, btnMoose, btnDog, btnBird, btnPenguin, ...threeDCharacterButtons.values(), btnCustomTrig].forEach(btn => {
                 if (btn.id === 'btn-custom-trigger') btn.className = 'w-full bg-indigo-50 text-indigo-500 rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-200 transition active:scale-95 hover:bg-indigo-100';
                 else btn.className = 'bg-slate-100 text-slate-500 rounded-2xl p-2.5 flex flex-col items-center border-2 border-transparent transition active:scale-95';
             });
@@ -1127,10 +1140,12 @@
                 penguin: 'bg-slate-200 text-slate-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-slate-400 shadow-sm transition active:scale-95'
             };
             if (characterButtons[activeChar]) characterButtons[activeChar].className = activeClasses[activeChar];
-            if (activeChar === CORE_CHARACTER_ID) btnCowboy.className = 'bg-amber-100 text-amber-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-amber-300 shadow-sm transition active:scale-95';
+            if (THREE_D_CHARACTER_IDS.has(activeChar)) {
+                threeDCharacterButtons.get(activeChar).className = 'bg-amber-100 text-amber-800 rounded-2xl p-2.5 flex flex-col items-center border-2 border-amber-300 shadow-sm transition active:scale-95';
+            }
             if (activeChar === 'custom') btnCustomTrig.className = 'w-full bg-indigo-500 text-white rounded-2xl p-2.5 flex items-center justify-center gap-2 border-2 border-indigo-600 shadow-md transition active:scale-95';
             
-            selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom' || activeChar === CORE_CHARACTER_ID);
+            selectedVariant = savedVariants[activeChar] || 0; selectVariant.value = selectedVariant; selectVariant.disabled = (activeChar === 'custom' || THREE_D_CHARACTER_IDS.has(activeChar));
             if(!camera.isActive) drawScene();
         }
 
@@ -1138,11 +1153,67 @@
         Object.entries(characterButtons).forEach(([character, button]) => {
             button.onclick = () => updateCharacterSelection(character);
         });
-        btnCowboy.onclick = () => {
-            updateCharacterSelection(CORE_CHARACTER_ID);
-            loadTest3DModel(false);
-        };
-        btnLoadTest3D.onclick = () => loadTest3DModel();
+        btnLoadTest3D.onclick = () => load3DCharacter();
+
+        async function load3DCharacterCatalog() {
+            try {
+                const response = await fetch(new URL('models/characters.json', document.baseURI));
+                if (!response.ok) throw new Error(`Character catalog request failed with HTTP ${response.status}.`);
+                const data = await response.json();
+                if (!data || !Array.isArray(data.characters) || data.characters.length === 0) {
+                    throw new Error("Character catalog must contain a non-empty characters array.");
+                }
+
+                const ids = new Set();
+                data.characters.forEach(character => {
+                    if (!character || typeof character.id !== 'string' || !character.id.trim()
+                        || typeof character.name !== 'string' || !character.name.trim()
+                        || typeof character.icon !== 'string' || !character.icon.trim()
+                        || typeof character.model !== 'string' || !character.model.trim()
+                        || ids.has(character.id)) {
+                        throw new Error("Each 3D character needs a unique id, name, icon, and model path.");
+                    }
+                    ids.add(character.id);
+                });
+                if (!ids.has(CORE_CHARACTER_ID)) {
+                    throw new Error(`Character catalog must define the "${CORE_CHARACTER_ID}" character.`);
+                }
+
+                threeDCharacterCatalog = data.characters;
+                THREE_D_CHARACTER_IDS.clear();
+                characterButtons3DContainer.replaceChildren();
+                threeDCharacterCatalog.forEach(character => {
+                    THREE_D_CHARACTER_IDS.add(character.id);
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'bg-slate-100 text-slate-500 rounded-2xl p-2.5 flex flex-col items-center border-2 border-transparent transition active:scale-95';
+                    button.setAttribute('aria-label', character.name);
+                    const icon = document.createElement('span');
+                    icon.className = 'text-xl mb-1';
+                    icon.textContent = character.icon;
+                    const name = document.createElement('span');
+                    name.className = 'text-[10px] font-bold';
+                    name.textContent = character.name;
+                    button.append(icon, name);
+                    button.addEventListener('click', () => {
+                        updateCharacterSelection(character.id);
+                        load3DCharacter(character.id, false);
+                    });
+                    threeDCharacterButtons.set(character.id, button);
+                    characterButtons3DContainer.append(button);
+                });
+                characterCatalogStatus.textContent = '';
+                characterCatalogStatus.classList.remove('text-rose-600');
+                savedVariants[CORE_CHARACTER_ID] = savedVariants[CORE_CHARACTER_ID] || 0;
+                if (THREE_D_CHARACTER_IDS.has(selectedCharacter)) {
+                    updateCharacterSelection(selectedCharacter);
+                }
+            } catch (error) {
+                console.error("Could not load 3D character catalog:", error);
+                characterCatalogStatus.textContent = `Could not load 3D characters: ${error.message}`;
+                characterCatalogStatus.classList.add('text-rose-600');
+            }
+        }
 
         selectVariant.addEventListener('change', (e) => { selectedVariant = parseInt(e.target.value); savedVariants[selectedCharacter] = selectedVariant; if(!camera.isActive) drawScene(); });
         sliderEyes.addEventListener('input', (e) => { eyeScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
@@ -1308,6 +1379,7 @@
 
         fullscreen = setupFullscreen({ resizeCanvases });
         accessoryManager.loadCatalog();
+        load3DCharacterCatalog();
 
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && camera.isActive) { if (video.paused) video.play().catch(()=>{}); if (pipVideo.paused) pipVideo.play().catch(()=>{}); } });
 

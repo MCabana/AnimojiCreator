@@ -25,8 +25,26 @@ Camera access requires `localhost` or HTTPS. Opening `index.html` directly with 
 - `js/preview-background.js` — still/video backgrounds and solid color.
 - `js/accessory-manager.js` — accessory catalog validation, character compatibility selectors, skeleton remapping, and accessory resource lifecycle.
 - `models/core/` — core 3D character model.
+- `models/characters.json` — 3D character IDs, button names and icons, and model paths.
 - `models/attachments/hats/` and `models/attachments/shirts/` — selectable, rig-bound accessories.
 - `models/accessories.json` — accessory names, slots, model paths, and compatible character IDs.
+
+## Configure 3D characters
+
+Edit `models/characters.json` to add or change 3D character buttons. Each character needs a unique `id`, button `name`, button `icon`, and `model` path relative to the project root. The model path is loaded directly when its button is selected. Keep character IDs in `models/accessories.json` in sync for accessory compatibility.
+
+```json
+{
+  "characters": [
+    {
+      "id": "uncle",
+      "name": "Uncle",
+      "icon": "👨",
+      "model": "models/core/uncle.glb"
+    }
+  ]
+}
+```
 
 ## Configure accessories
 
@@ -35,7 +53,7 @@ Edit `models/accessories.json` to add or change accessories. Each entry in `comp
 ```json
 {
   "characters": [
-    { "id": "cowboy", "name": "Standard" }
+    { "id": "standard", "name": "Standard" }
   ],
   "accessories": [
     {
@@ -43,13 +61,13 @@ Edit `models/accessories.json` to add or change accessories. Each entry in `comp
       "name": "Winter Hat",
       "slot": "hat",
       "model": "models/attachments/hats/winterHat.glb",
-      "compatibleCharacters": ["cowboy"]
+      "compatibleCharacters": ["standard"]
     }
   ]
 }
 ```
 
-`cowboy` (Standard) is currently the only rigged 3D character. The 2D animals do not have 3D skeletons for accessories to attach to yet.
+Standard and Uncle are available in the 3D character selection. Standard is currently the only 3D character configured for accessories. The 2D animals do not have 3D skeletons for accessories to attach to yet.
 
 ## Preview backgrounds
 

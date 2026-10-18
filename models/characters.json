@@ -1,0 +1,16 @@
+{
+  "characters": [
+    {
+      "id": "standard",
+      "name": "Standard",
+      "icon": "🥸",
+      "model": "models/core/character.glb"
+    },
+    {
+      "id": "uncle",
+      "name": "Uncle",
+      "icon": "👨",
+      "model": "models/core/uncle.glb"
+    }
+  ]
+}
