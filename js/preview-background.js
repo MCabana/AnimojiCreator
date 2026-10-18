@@ -1,11 +1,8 @@
-const BABYLON = window.BABYLON;
-
 export function createPreviewBackground({
     canvas,
     context,
     fileInput,
     colorInput,
-    lightingMatchInput,
     status,
     clearButton,
     renderPreview,
@@ -16,65 +13,10 @@ export function createPreviewBackground({
     let mediaUrl = null;
     let loadToken = 0;
     let videoFrameRequest = 0;
-    let lastLightingSample = 0;
-    let ambientLight = null;
-    let directionalLight = null;
-
-    const neutralLightColor = BABYLON.Color3.FromHexString("#fffaf5");
-    const sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = 16;
-    sampleCanvas.height = 16;
-    const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true });
-    const averageColor = new BABYLON.Color3();
 
     function setStatus(message, isError = false) {
         status.textContent = message;
         status.className = `mt-2 truncate text-[10px] ${isError ? 'text-rose-600' : 'text-slate-500'}`;
-    }
-
-    function resetLightingTint() {
-        ambientLight?.diffuse.copyFrom(neutralLightColor);
-        directionalLight?.diffuse.copyFrom(neutralLightColor);
-    }
-
-    function updateLighting(source) {
-        if (!lightingMatchInput.checked || !ambientLight || !directionalLight) return;
-        const sourceWidth = source.videoWidth || source.naturalWidth;
-        const sourceHeight = source.videoHeight || source.naturalHeight;
-        if (!sourceWidth || !sourceHeight) return;
-
-        const scale = Math.max(sampleCanvas.width / sourceWidth, sampleCanvas.height / sourceHeight);
-        const width = sourceWidth * scale;
-        const height = sourceHeight * scale;
-        try {
-            sampleContext.fillStyle = solidColor;
-            sampleContext.fillRect(0, 0, sampleCanvas.width, sampleCanvas.height);
-            sampleContext.drawImage(
-                source,
-                (sampleCanvas.width - width) / 2,
-                (sampleCanvas.height - height) / 2,
-                width,
-                height
-            );
-
-            const { data } = sampleContext.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height);
-            let red = 0;
-            let green = 0;
-            let blue = 0;
-            for (let index = 0; index < data.length; index += 4) {
-                red += data[index];
-                green += data[index + 1];
-                blue += data[index + 2];
-            }
-            const pixelCount = data.length / 4;
-            averageColor.copyFromFloats(red / pixelCount / 255, green / pixelCount / 255, blue / pixelCount / 255);
-        } catch (error) {
-            console.error("Could not sample the preview background for 3D lighting:", error);
-            return;
-        }
-
-        ambientLight.diffuse.copyFrom(neutralLightColor).lerpToRef(averageColor, 0.3, ambientLight.diffuse);
-        directionalLight.diffuse.copyFrom(neutralLightColor).lerpToRef(averageColor, 0.2, directionalLight.diffuse);
     }
 
     function releaseMedia() {
@@ -116,21 +58,12 @@ export function createPreviewBackground({
         videoFrameRequest = requestAnimationFrame(() => drawVideoFrames(token));
     }
 
-    function updateVideoLighting() {
-        if (media?.type !== 'video' || !lightingMatchInput.checked) return;
-        if (performance.now() - lastLightingSample >= 500) {
-            updateLighting(media.element);
-            lastLightingSample = performance.now();
-        }
-    }
-
     function failLoad(token, file, error) {
         if (token !== loadToken) return;
         console.error("Could not load background media:", error);
         releaseMedia();
         fileInput.value = '';
         clearButton.disabled = true;
-        resetLightingTint();
         setStatus(`Could not load ${file.name}`, true);
         renderPreview();
     }
@@ -138,7 +71,6 @@ export function createPreviewBackground({
     function load(file) {
         const token = ++loadToken;
         releaseMedia();
-        resetLightingTint();
         if (!file) {
             fileInput.value = '';
             clearButton.disabled = true;
@@ -162,7 +94,6 @@ export function createPreviewBackground({
             media = { type: 'image', element: image };
             image.onload = () => {
                 if (token !== loadToken) return;
-                if (lightingMatchInput.checked) updateLighting(image);
                 setStatus(file.name);
                 renderPreview();
             };
@@ -179,8 +110,6 @@ export function createPreviewBackground({
             media = { type: 'video', element: backgroundVideo };
             backgroundVideo.addEventListener('loadeddata', () => {
                 if (token !== loadToken) return;
-                if (lightingMatchInput.checked) updateLighting(backgroundVideo);
-                lastLightingSample = performance.now();
                 setStatus(`${file.name} (looping)`);
                 renderPreview();
                 if (!isCameraActive()) drawVideoFrames(token);
@@ -200,21 +129,9 @@ export function createPreviewBackground({
         solidColor = colorInput.value;
         renderPreview();
     });
-    lightingMatchInput.addEventListener('change', () => {
-        if (lightingMatchInput.checked && media) updateLighting(media.element);
-        else resetLightingTint();
-        renderPreview();
-    });
 
     return {
         get color() { return solidColor; },
-        draw,
-        updateVideoLighting,
-        setLights(ambient, directional) {
-            ambientLight = ambient;
-            directionalLight = directional;
-            if (lightingMatchInput.checked && media) updateLighting(media.element);
-            else resetLightingTint();
-        }
+        draw
     };
 }

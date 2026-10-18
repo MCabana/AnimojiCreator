@@ -22,7 +22,7 @@ Camera access requires `localhost` or HTTPS. Opening `index.html` directly with 
 - `js/recording.js` — canvas video recording.
 - `js/fullscreen.js` — fullscreen viewport controls.
 - `js/custom-character-editor.js` — custom 2D image upload, face masking, feature placement, and magnifier.
-- `js/preview-background.js` — still/video backgrounds, solid color, and optional media-matched Babylon.js lighting.
+- `js/preview-background.js` — still/video backgrounds and solid color.
 - `js/accessory-manager.js` — accessory catalog validation, character compatibility selectors, skeleton remapping, and accessory resource lifecycle.
 - `models/core/` — core 3D character model.
 - `models/attachments/hats/` and `models/attachments/shirts/` — selectable, rig-bound accessories.
@@ -53,4 +53,4 @@ Edit `models/accessories.json` to add or change accessories. Each entry in `comp
 
 ## Preview backgrounds
 
-Use the **Background** controls in the studio panel to choose a solid color, still image, or video file. The solid color is used when no image or video is selected. Images are cropped to cover the character viewport; videos are muted and loop automatically. The selected background is composited behind both 2D and 3D characters and is included in canvas recordings. In 3D mode, enable **Match 3D lighting to media** to tint the ambient and directional lights from the average color of an image or video; this lighting also affects the 3D eye and mouth planes. Solid colors do not affect lighting, and video backgrounds are sampled twice per second. The toggle is enabled by default. Use **Clear** to remove a selected image or video and return to the chosen solid color.
+Use the **Background** controls in the studio panel to choose a solid color, still image, or video file. The solid color is used when no image or video is selected. Images are cropped to cover the character viewport; videos are muted and loop automatically. The selected background is composited behind both 2D and 3D characters and is included in canvas recordings. Use **Clear** to remove a selected image or video and return to the chosen solid color.

@@ -21,7 +21,6 @@
         const statusIndicator = document.getElementById('status-indicator');
         const backgroundFile = document.getElementById('background-file');
         const backgroundColor = document.getElementById('background-color');
-        const backgroundLightingMatch = document.getElementById('background-lighting-match');
         const backgroundStatus = document.getElementById('background-status');
         const clearBackgroundButton = document.getElementById('btn-clear-background');
         const btnCamera = document.getElementById('btn-camera');
@@ -387,7 +386,6 @@
             context: ctx,
             fileInput: backgroundFile,
             colorInput: backgroundColor,
-            lightingMatchInput: backgroundLightingMatch,
             status: backgroundStatus,
             clearButton: clearBackgroundButton,
             renderPreview: drawScene,
@@ -443,7 +441,6 @@
             ctx.fillStyle = previewBackgroundManager.color;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             previewBackgroundManager.draw();
-            previewBackgroundManager.updateVideoLighting();
             
             let cx = canvas.width / 2;
             let cy = canvas.height / 2;
@@ -681,7 +678,6 @@
             directionalLight.diffuse = BABYLON.Color3.FromHexString("#fffaf5");
             directionalLight.position.set(2, 4, 3);
             directionalLight.intensity = 0.5;
-            previewBackgroundManager.setLights(ambientLight, directionalLight);
         }
 
         function render3DScene() {
