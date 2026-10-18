@@ -44,8 +44,21 @@
       "slot": "shirt",
       "model": "models/attachments/shirts/firefighterShirt.glb",
       "compatibleCharacters": ["standard","uncle"]
-    }
-    ,
+    },
+    {
+      "id": "constructionVest",
+      "name": "Construction Vest",
+      "slot": "shirt",
+      "model": "models/attachments/shirts/constructionVest.glb",
+      "compatibleCharacters": ["standard","uncle"]
+    },
+    {
+      "id": "constructionHelmet",
+      "name": "Construction Helmet",
+      "slot": "hat",
+      "model": "models/attachments/hats/constructionHat.glb",
+      "compatibleCharacters": ["standard","uncle"]
+    },
     {
       "id": "assassin-shirt",
       "name": "Assassin Shirt",
