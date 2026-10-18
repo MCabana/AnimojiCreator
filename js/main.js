@@ -54,6 +54,8 @@
         let offsetPitch = 0;
         let offsetPositionX = 0;
         let offsetPositionY = 0;
+        let neutralHeadZ = null;
+        let currentHeadZ = 0;
         let neutralFaceAspectRatio = null;
         let requestRecenter = false;
 
@@ -458,6 +460,20 @@
             const vw = video.videoWidth || 640; const vh = video.videoHeight || 480;
             const isCustomStatic = (selectedCharacter === 'custom' && customSettings.isStatic);
 
+            if (camera.trackingResults && camera.trackingResults.facialTransformationMatrixes && camera.trackingResults.facialTransformationMatrixes.length > 0) {
+                const matrix = camera.trackingResults.facialTransformationMatrixes[0];
+                const matrixData = matrix.data || matrix;
+                if (matrixData && matrixData.length >= 15) {
+                    const rawZ = matrixData[14];
+                    if (!isNaN(rawZ) && rawZ !== 0) {
+                        if (neutralHeadZ === null) {
+                            neutralHeadZ = rawZ;
+                        }
+                        currentHeadZ = rawZ;
+                    }
+                }
+            }
+
             if (camera.trackingResults && camera.trackingResults.faceLandmarks && camera.trackingResults.faceLandmarks.length > 0) {
                 landmarks = camera.trackingResults.faceLandmarks[0];
                 const nose = landmarks[1];
@@ -497,6 +513,7 @@
                         offsetRoll = rawAngle; offsetYaw = localYaw; offsetPitch = rawPitch - 0.30;
                         offsetPositionX = (1.0 - nose.x) - 0.5;
                         offsetPositionY = nose.y - 0.5;
+                        if (currentHeadZ !== 0) neutralHeadZ = currentHeadZ;
                         cx = canvas.width / 2;
                         cy = canvas.height / 2;
                         if (faceAspectRatio > 0) neutralFaceAspectRatio = faceAspectRatio;
@@ -678,12 +695,12 @@
             model3DCamera.setTarget(BABYLON.Vector3.Zero());
             const ambientLight = new BABYLON.HemisphericLight('preview-ambient', new BABYLON.Vector3(0, 1, 0), model3DScene);
             ambientLight.diffuse = BABYLON.Color3.FromHexString("#fffaf5");
-            ambientLight.groundColor = BABYLON.Color3.FromHexString("#706b62");
-            ambientLight.intensity = 0.8;
+            ambientLight.groundColor = BABYLON.Color3.FromHexString("#a39b90");
+            ambientLight.intensity = 1.2;
             const directionalLight = new BABYLON.DirectionalLight('preview-directional', new BABYLON.Vector3(-2, -4, -3), model3DScene);
             directionalLight.diffuse = BABYLON.Color3.FromHexString("#fffaf5");
             directionalLight.position.set(2, 4, 3);
-            directionalLight.intensity = 0.5;
+            directionalLight.intensity = 0.8;
         }
 
         function render3DScene() {
@@ -948,12 +965,25 @@
                 
                 const targetTransX = -screenDx * frustumWidth;
                 const targetTransY = -screenDy * frustumHeight;
+
+                let targetTransZ = 0;
+                if (neutralHeadZ !== null && currentHeadZ !== 0) {
+                    const deltaZ = currentHeadZ - neutralHeadZ;
+                    // deltaZ > 0 when user moves closer to the camera
+                    targetTransZ = Math.max(-1.5, Math.min(1.5, deltaZ * 0.04));
+                }
                 
-                if (loadedModelRoot.tx === undefined) { loadedModelRoot.tx = 0; loadedModelRoot.ty = 0; }
+                if (loadedModelRoot.tx === undefined) { 
+                    loadedModelRoot.tx = 0; 
+                    loadedModelRoot.ty = 0; 
+                    loadedModelRoot.tz = 0; 
+                }
                 loadedModelRoot.tx += (targetTransX - loadedModelRoot.tx) * 0.4;
                 loadedModelRoot.ty += (targetTransY - loadedModelRoot.ty) * 0.4;
+                loadedModelRoot.tz += (targetTransZ - loadedModelRoot.tz) * 0.3;
                 loadedModelRoot.position.x = loadedModelRoot.tx;
                 loadedModelRoot.position.y = loadedModelRoot.baseY + loadedModelRoot.ty;
+                loadedModelRoot.position.z = loadedModelRoot.tz;
 
                 swayPitch = -screenDy * 1.0;
             }

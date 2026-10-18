@@ -28,6 +28,7 @@ export function setupCamera({
                     delegate: "CPU"
                 },
                 outputFaceBlendshapes: true,
+                outputFacialTransformationMatrixes: true,
                 runningMode: "VIDEO",
                 numFaces: 1
             });
@@ -36,6 +37,8 @@ export function setupCamera({
                     modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
                     delegate: "CPU"
                 },
+                outputFaceBlendshapes: true,
+                outputFacialTransformationMatrixes: true,
                 runningMode: "IMAGE",
                 numFaces: 1,
                 minFaceDetectionConfidence: 0.1,
