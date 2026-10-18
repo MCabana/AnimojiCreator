@@ -126,6 +126,15 @@
             livePlanes = {};
         }
 
+        function updateLivePlaneCounterRotations() {
+            Object.values(livePlanes).forEach(plane => {
+                if (!plane.anchor || !plane.anchor.parent) return;
+                // Keep the plane anchored to the bone in its initial rest orientation,
+                // so it follows the 3D head bone 1:1 in yaw, pitch, and roll.
+                plane.anchor.rotationQuaternion.copyFrom(plane.initialAnchorLocalRotation);
+            });
+        }
+
         function createLivePlane(bone, name) {
             const cvs = document.createElement('canvas');
             cvs.width = 256; cvs.height = 256;
@@ -175,7 +184,13 @@
             anchor.parent = bone;
             mesh.parent = anchor;
             
-            livePlanes[name] = { canvas: cvs, texture: tex, mesh: mesh, anchor: anchor };
+            livePlanes[name] = {
+                canvas: cvs,
+                texture: tex,
+                mesh,
+                anchor,
+                initialAnchorLocalRotation: anchor.rotationQuaternion.clone()
+            };
             updateLivePlaneCurvature(livePlanes[name]);
         }
 
@@ -223,8 +238,7 @@
             
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
-            if (rollAngle !== 0) ctx.rotate(-rollAngle);
-            if (flipFor3D) ctx.scale(-1, 1);
+            if (rollAngle !== 0) ctx.rotate(rollAngle);
             
             // 1. Draw the face boundary, expanded and heavily blurred to feather the edges
             ctx.save();
@@ -232,7 +246,7 @@
             ctx.beginPath();
             indices.forEach((idx, i) => {
                 const pt = landmarks[idx];
-                const dx = ((1.0 - pt.x) - (1.0 - anchorX)) * vw * scale;
+                const dx = (pt.x - anchorX) * vw * scale;
                 const dy = (pt.y - anchorY) * vh * scale;
                 if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
             });
@@ -246,7 +260,6 @@
             
             // 2. Composite the video frame on top so it seamlessly blends into transparency
             ctx.globalCompositeOperation = 'source-in';
-            ctx.scale(-1, 1); // Flip horizontally because the video input is mirrored
             const drawW = vw * scale;
             const drawH = vh * scale;
             ctx.drawImage(video, -anchorX * drawW, -anchorY * drawH, drawW, drawH);
@@ -418,20 +431,21 @@
             if ((selectedCharacter === 'custom' || selectedCharacter === CORE_CHARACTER_ID) && customSettings.is3D && model3DEngine) {
                 const activeCx = isCustomStatic ? screenCenterX : cx;
                 const activeCy = isCustomStatic ? screenCenterY : cy;
-                update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy, pitchAxisScale);
+                const trackedRoll = update3DModelRigging(landmarks, angle, yawX, pitchY, activeCx, activeCy, pitchAxisScale);
+                updateLivePlaneCounterRotations();
                 
                 if (livePlanes.eye_left) {
-                    updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, true, angle);
+                    updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, true, trackedRoll);
                     updateLivePlaneTexture(livePlanes.eye_left);
                     livePlanes.eye_left.mesh.scaling.setAll(eyeScale * 1.3);
                 }
                 if (livePlanes.eye_right) {
-                    updateTextureCanvas(livePlanes.eye_right.canvas, landmarks, LEFT_EYE_CONTOUR, true, angle);
+                    updateTextureCanvas(livePlanes.eye_right.canvas, landmarks, LEFT_EYE_CONTOUR, true, trackedRoll);
                     updateLivePlaneTexture(livePlanes.eye_right);
                     livePlanes.eye_right.mesh.scaling.setAll(eyeScale * 1.3);
                 }
                 if (livePlanes.mouth) {
-                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, true, angle);
+                    updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, true, trackedRoll);
                     updateLivePlaneTexture(livePlanes.mouth);
 
                     let mouthOpenScale = 1.0;
@@ -823,7 +837,7 @@
         }
 
         function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScale) {
-            if (!modelBones.head) return;
+            if (!modelBones.head) return 0;
             
             const targetYaw = yaw / 150; const targetPitch = (pitch / 100) * pitchAxisScale; const targetRoll = roll;
             const now = performance.now();
@@ -835,7 +849,7 @@
             const totalPitch = smoothedPitch * 0.8;
             const totalRoll = -smoothedRoll * 2.0;
 
-            let swayPitch = 0; let swayRoll = 0;
+            let swayPitch = 0;
 
             if (loadedModelRoot && cx !== undefined && cy !== undefined) {
                 const screenDx = (cx - canvas.width / 2) / canvas.width;
@@ -853,7 +867,7 @@
                 loadedModelRoot.position.x = loadedModelRoot.tx;
                 loadedModelRoot.position.y = loadedModelRoot.baseY + loadedModelRoot.ty;
 
-                swayPitch = -screenDy * 1.0; swayRoll = -screenDx * 1.2; 
+                swayPitch = -screenDy * 1.0;
             }
 
             const wSpine0 = 0.10; const wSpine1 = 0.20; const wNeck = 0.30; const wHead = 0.40;
@@ -863,7 +877,7 @@
                     modelBones.spine_0,
                     totalYaw * wSpine0,
                     totalPitch * wSpine0 + swayPitch * 0.5,
-                    totalRoll * wSpine0 + swayRoll * 0.5
+                    totalRoll * wSpine0
                 );
             }
             if (modelBones.spine_1) {
@@ -871,7 +885,7 @@
                     modelBones.spine_1,
                     totalYaw * wSpine1,
                     totalPitch * wSpine1 + swayPitch * 0.5,
-                    totalRoll * wSpine1 + swayRoll * 0.5
+                    totalRoll * wSpine1
                 );
             }
             if (modelBones.neck) {
@@ -879,7 +893,7 @@
                     modelBones.neck,
                     totalYaw * wNeck,
                     totalPitch * wNeck - swayPitch * 0.2,
-                    totalRoll * wNeck - swayRoll * 0.2
+                    totalRoll * wNeck
                 );
             }
             if (modelBones.head) {
@@ -891,6 +905,7 @@
                 setTrackedRotation(modelBones.eye_left, eyeGazeYaw, 0, 0);
                 setTrackedRotation(modelBones.eye_right, eyeGazeYaw, 0, 0);
             }
+            return smoothedRoll;
         }
 
         function drawAlignedCutout(landmarks, indices, targetX, targetY, scale, rollAngle, skinColor, anchorPt = null, featherScale = 1.0, flipHorizontal = false) {
