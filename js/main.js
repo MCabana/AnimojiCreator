@@ -940,8 +940,8 @@
                 const frustumHeight = 2 * Math.tan(model3DCamera.fov / 2) * model3DCamera.position.z;
                 const frustumWidth = frustumHeight * aspect;
                 
-                const targetTransX = screenDx * frustumWidth * 0.3; 
-                const targetTransY = -screenDy * frustumHeight * 0.3;
+                const targetTransX = -screenDx * frustumWidth;
+                const targetTransY = -screenDy * frustumHeight;
                 
                 if (loadedModelRoot.tx === undefined) { loadedModelRoot.tx = 0; loadedModelRoot.ty = 0; }
                 loadedModelRoot.tx += (targetTransX - loadedModelRoot.tx) * 0.4;
