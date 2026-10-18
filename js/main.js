@@ -52,6 +52,8 @@
         let offsetRoll = 0;
         let offsetYaw = 0;
         let offsetPitch = 0;
+        let offsetPositionX = 0;
+        let offsetPositionY = 0;
         let neutralFaceAspectRatio = null;
         let requestRecenter = false;
 
@@ -461,8 +463,8 @@
                 const nose = landmarks[1];
                 const leftCorner = landmarks[33]; const rightCorner = landmarks[263]; 
                 
-                cx = (1.0 - nose.x) * canvas.width;
-                cy = nose.y * canvas.height;
+                cx = ((1.0 - nose.x) - offsetPositionX) * canvas.width;
+                cy = (nose.y - offsetPositionY) * canvas.height;
                 
                 const dxRoll = ((1.0 - leftCorner.x) - (1.0 - rightCorner.x)) * vw;
                 const dyRoll = (leftCorner.y - rightCorner.y) * vh;
@@ -493,6 +495,10 @@
                     
                     if (requestRecenter) {
                         offsetRoll = rawAngle; offsetYaw = localYaw; offsetPitch = rawPitch - 0.30;
+                        offsetPositionX = (1.0 - nose.x) - 0.5;
+                        offsetPositionY = nose.y - 0.5;
+                        cx = canvas.width / 2;
+                        cy = canvas.height / 2;
                         if (faceAspectRatio > 0) neutralFaceAspectRatio = faceAspectRatio;
                         requestRecenter = false;
                         btnRecenter.textContent = "Centered!"; btnRecenter.classList.add('bg-emerald-100', 'text-emerald-600', 'border-emerald-200');
