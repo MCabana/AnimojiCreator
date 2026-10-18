@@ -145,8 +145,11 @@
             tex.update();
             const mat = new BABYLON.StandardMaterial(`${name}-material`, model3DScene);
             mat.diffuseTexture = tex;
+            mat.emissiveColor = new BABYLON.Color3(1, 1, 1);
+            mat.disableLighting = true;
             mat.useAlphaFromDiffuseTexture = true;
             mat.backFaceCulling = false;
+            mat.disableDepthWrite = true;
             mat.alpha = 1;
             mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
             mat.needAlphaBlending = () => true;
