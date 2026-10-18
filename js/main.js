@@ -149,6 +149,7 @@
             mat.backFaceCulling = false;
             mat.alpha = 1;
             mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+            mat.needAlphaBlending = () => true;
             const mesh = new BABYLON.Mesh(`${name}-plane`, model3DScene);
             const positions = [];
             const indices = [];
@@ -210,6 +211,41 @@
             plane.mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals, false);
         }
 
+        let scratchVideoCanvas = null;
+        let scratchVideoCtx = null;
+        function getScratchVideoCanvas(w, h) {
+            if (!scratchVideoCanvas) {
+                scratchVideoCanvas = document.createElement('canvas');
+                scratchVideoCanvas.width = w;
+                scratchVideoCanvas.height = h;
+                scratchVideoCtx = scratchVideoCanvas.getContext('2d');
+            } else if (scratchVideoCanvas.width !== w || scratchVideoCanvas.height !== h) {
+                scratchVideoCanvas.width = w;
+                scratchVideoCanvas.height = h;
+            }
+            return { canvas: scratchVideoCanvas, ctx: scratchVideoCtx };
+        }
+
+        let canvasFilterSupported = null;
+        function isCanvasFilterSupported() {
+            if (canvasFilterSupported !== null) return canvasFilterSupported;
+            try {
+                const c = document.createElement('canvas');
+                c.width = 1; c.height = 1;
+                const tCtx = c.getContext('2d');
+                if (!tCtx || !('filter' in tCtx)) {
+                    canvasFilterSupported = false;
+                    return false;
+                }
+                tCtx.filter = 'blur(2px)';
+                canvasFilterSupported = (tCtx.filter === 'blur(2px)');
+                return canvasFilterSupported;
+            } catch (e) {
+                canvasFilterSupported = false;
+                return false;
+            }
+        }
+
         function updateTextureCanvas(canvas, landmarks, indices, flipFor3D = false, rollAngle = 0) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -217,6 +253,7 @@
             
             const vw = video.videoWidth;
             const vh = video.videoHeight;
+            if (!vw || !vh) return;
             
             let minX = 1, maxX = 0, minY = 1, maxY = 0;
             indices.forEach(idx => {
@@ -232,39 +269,85 @@
             
             const featureW = (maxX - minX) * vw;
             const featureH = (maxY - minY) * vh;
+            if (featureW <= 0 || featureH <= 0) return;
             
             // Reduce scale slightly to 0.55 to leave padding on the canvas for the feathered mask
             const scale = Math.min(canvas.width / featureW, canvas.height / featureH) * 0.55; 
             
+            // 1. Draw the feathered mask onto canvas
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
             if (rollAngle !== 0) ctx.rotate(rollAngle);
             
-            // 1. Draw the face boundary, expanded and heavily blurred to feather the edges
-            ctx.save();
-            ctx.scale(1.4, 1.4); // Expand the masked area by 40% to show more surrounding skin
-            ctx.beginPath();
-            indices.forEach((idx, i) => {
-                const pt = landmarks[idx];
-                const dx = (pt.x - anchorX) * vw * scale;
-                const dy = (pt.y - anchorY) * vh * scale;
-                if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
-            });
-            ctx.closePath();
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.filter = 'blur(12px)'; // Apply heavy feathering to the mask edges
-            ctx.fill();
-            ctx.fill(); // Fill twice to keep the center solidly opaque
+            if (isCanvasFilterSupported()) {
+                // Browsers supporting ctx.filter (Chrome, Edge, Firefox, Android)
+                ctx.save();
+                ctx.scale(1.4, 1.4); // Expand masked area by 40% to show more surrounding skin
+                ctx.beginPath();
+                indices.forEach((idx, i) => {
+                    const pt = landmarks[idx];
+                    const dx = (pt.x - anchorX) * vw * scale;
+                    const dy = (pt.y - anchorY) * vh * scale;
+                    if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
+                });
+                ctx.closePath();
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.filter = 'blur(12px)'; // Apply heavy feathering to the mask edges
+                ctx.fill();
+                ctx.fill(); // Fill twice to keep the center solidly opaque
+                ctx.filter = 'none';
+                ctx.restore();
+            } else {
+                // Safari / iOS WebKit where ctx.filter is disabled by default:
+                // Create a smooth feathered falloff using a radial/elliptical gradient matching the feature size
+                const rx = (featureW * scale * 0.5) * 1.45;
+                const minRy = rx * 0.6;
+                const ry = Math.max((featureH * scale * 0.5) * 1.45, minRy);
+
+                ctx.save();
+                ctx.scale(1, ry / rx);
+                const grad = ctx.createRadialGradient(0, 0, rx * 0.45, 0, 0, rx);
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.5, '#ffffff');
+                grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(0, 0, rx, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Fill the contour core solidly
+                ctx.save();
+                ctx.beginPath();
+                indices.forEach((idx, i) => {
+                    const pt = landmarks[idx];
+                    const dx = (pt.x - anchorX) * vw * scale;
+                    const dy = (pt.y - anchorY) * vh * scale;
+                    if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
+                });
+                ctx.closePath();
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.restore();
+            }
             ctx.restore();
             
-            // 2. Composite the video frame on top so it seamlessly blends into transparency
-            ctx.globalCompositeOperation = 'source-in';
+            // 2. Render video to scratch canvas first to avoid Safari's HTMLVideoElement source-in compositing bug
+            const { canvas: sCanvas, ctx: sCtx } = getScratchVideoCanvas(canvas.width, canvas.height);
+            sCtx.clearRect(0, 0, sCanvas.width, sCanvas.height);
+            sCtx.save();
+            sCtx.translate(sCanvas.width / 2, sCanvas.height / 2);
+            if (rollAngle !== 0) sCtx.rotate(rollAngle);
             const drawW = vw * scale;
             const drawH = vh * scale;
-            ctx.drawImage(video, -anchorX * drawW, -anchorY * drawH, drawW, drawH);
-            
-            ctx.restore();
+            sCtx.drawImage(video, -anchorX * drawW, -anchorY * drawH, drawW, drawH);
+            sCtx.restore();
+
+            // 3. Composite the video onto the feathered mask
+            ctx.globalCompositeOperation = 'source-in';
+            ctx.drawImage(sCanvas, 0, 0);
+            ctx.globalCompositeOperation = 'source-over';
         }
 
         function updateLivePlaneTexture(plane) {
