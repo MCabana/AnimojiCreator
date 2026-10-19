@@ -7,7 +7,20 @@
     {
       "id": "uncle",
       "name": "Uncle"
+    },
+    {
+      "id": "dad",
+      "name": "The Dad"
+    },
+    {
+      "id": "oldFriend",
+      "name": "The Old Friend"
+    },
+    {
+      "id": "oldMan",
+      "name": "The Old Man"
     }
+    
   ],
   "accessories": [
     {
@@ -15,56 +28,70 @@
       "name": "Cowboy Hat",
       "slot": "hat",
       "model": "models/attachments/hats/cowboyHat.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "firefighter-helmet",
       "name": "Firefighter Helmet",
       "slot": "hat",
       "model": "models/attachments/hats/firefighterHelmet.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "cowboy-shirt",
       "name": "Cowboy Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/cowboyShirt.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "officer-shirt",
       "name": "Officer Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/officerShirt.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "firefighter-shirt",
       "name": "Firefighter Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/firefighterShirt.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "constructionVest",
       "name": "Construction Vest",
       "slot": "shirt",
       "model": "models/attachments/shirts/constructionVest.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "constructionHelmet",
       "name": "Construction Helmet",
       "slot": "hat",
       "model": "models/attachments/hats/constructionHat.glb",
-      "compatibleCharacters": ["standard","uncle"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
+    },
+    {
+      "id": "swat-shirt",
+      "name": "SWAT Shirt",
+      "slot": "shirt",
+      "model": "models/attachments/shirts/swatShirt.glb",
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
+    },
+    {
+      "id": "swatHelmet",
+      "name": "SWAT Helmet",
+      "slot": "hat",
+      "model": "models/attachments/hats/swatHelmet.glb",
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     },
     {
       "id": "assassin-shirt",
       "name": "Assassin Shirt",
       "slot": "shirt",
       "model": "models/attachments/shirts/assassinShirt.glb",
-      "compatibleCharacters": ["standard"]
+      "compatibleCharacters": ["standard","uncle","dad","oldFriend","oldMan"]
     }
   ]
 }

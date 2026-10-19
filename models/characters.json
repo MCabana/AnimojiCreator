@@ -4,13 +4,86 @@
       "id": "standard",
       "name": "Standard",
       "icon": "🥸",
-      "model": "models/core/character.glb"
+      "model": "models/core/character.glb",
+      "modelScale": 1,
+      "featureOffsets": {
+        "eye_left": [0, 0, 0],
+        "eye_right": [0, 0, 0],
+        "mouth": [0, 0, 0]
+      },
+      "featureScales": {
+        "eye_left": 1,
+        "eye_right": 1,
+        "mouth": 1
+      }
     },
     {
       "id": "uncle",
       "name": "Uncle",
       "icon": "👨",
-      "model": "models/core/uncle.glb"
+      "model": "models/core/uncle.glb",
+      "modelScale": 1,
+      "featureOffsets": {
+        "eye_left": [0, -0.03, 0.1],
+        "eye_right": [0, -0.03, 0.1],
+        "mouth": [0, -0.1, 0.012]
+      },
+      "featureScales": {
+        "eye_left": 1,
+        "eye_right": 1,
+        "mouth": 1
+      }
+    },
+    {
+      "id": "dad",
+      "name": "The Dad",
+      "icon": "👴",
+      "model": "models/core/theDad.glb",
+      "modelScale": 1,
+      "featureOffsets": {
+        "eye_left": [0, -0.15, 0.1],
+        "eye_right": [0, -0.15, 0.1],
+        "mouth": [0, -0.2, 0.08]
+      },
+      "featureScales": {
+        "eye_left": 1,
+        "eye_right": 1,
+        "mouth": 1
+      }
+    },
+    {
+      "id": "oldFriend",
+      "name": "TheOldFriend",
+      "icon": "👴",
+      "model": "models/core/theOldFriend.glb",
+      "modelScale": 1,
+      "featureOffsets": {
+        "eye_left": [-0.05, -0.1, 0.04],
+        "eye_right": [0.05, -0.1, 0.04],
+        "mouth": [0, -0.2, -0.02]
+      },
+      "featureScales": {
+        "eye_left": 0.85,
+        "eye_right": 0.85,
+        "mouth": 1
+      }
+    },
+    {
+      "id": "oldMan",
+      "name": "TheOldMan",
+      "icon": "👴",
+      "model": "models/core/theOldMan.glb",
+      "modelScale": 1,
+      "featureOffsets": {
+        "eye_left": [-0.05, -0.05, 0],
+        "eye_right": [0.05, -0.05, 0],
+        "mouth": [0, -0.1, -0.02]
+      },
+      "featureScales": {
+        "eye_left": 0.85,
+        "eye_right": 0.85,
+        "mouth": 1
+      }
     }
   ]
 }

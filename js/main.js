@@ -42,6 +42,7 @@
         const THREE_D_CHARACTER_IDS = new Set();
         const threeDCharacterButtons = new Map();
         let threeDCharacterCatalog = [];
+        let loaded3DCharacter = null;
         const characterButtons3DContainer = document.getElementById('character-buttons-3d');
         const characterCatalogStatus = document.getElementById('character-catalog-status');
         let selectedCharacter = 'bear';
@@ -548,12 +549,12 @@
                 if (livePlanes.eye_left) {
                     updateTextureCanvas(livePlanes.eye_left.canvas, landmarks, RIGHT_EYE_CONTOUR, true, trackedRoll);
                     updateLivePlaneTexture(livePlanes.eye_left);
-                    livePlanes.eye_left.mesh.scaling.setAll(eyeScale * 1.3);
+                    livePlanes.eye_left.mesh.scaling.setAll(eyeScale * 1.3 * getConfiguredFeatureScale('eye_left'));
                 }
                 if (livePlanes.eye_right) {
                     updateTextureCanvas(livePlanes.eye_right.canvas, landmarks, LEFT_EYE_CONTOUR, true, trackedRoll);
                     updateLivePlaneTexture(livePlanes.eye_right);
-                    livePlanes.eye_right.mesh.scaling.setAll(eyeScale * 1.3);
+                    livePlanes.eye_right.mesh.scaling.setAll(eyeScale * 1.3 * getConfiguredFeatureScale('eye_right'));
                 }
                 if (livePlanes.mouth) {
                     updateTextureCanvas(livePlanes.mouth.canvas, landmarks, MOUTH_CONTOUR, true, trackedRoll);
@@ -566,7 +567,12 @@
                         mouthOpenScale = 1.0 + (Math.abs(topLip.y - botLip.y) * 4.0);
                     }
                     const mouthWidthScale = 1.0 + (mouthOpenScale - 1.0) * 0.35;
-                    livePlanes.mouth.mesh.scaling.set(mouthScale * 1.3 * mouthWidthScale, mouthScale * 1.3 * mouthOpenScale, mouthScale * 1.3);
+                    const featureScale = getConfiguredFeatureScale('mouth');
+                    livePlanes.mouth.mesh.scaling.set(
+                        mouthScale * 1.3 * mouthWidthScale * featureScale,
+                        mouthScale * 1.3 * mouthOpenScale * featureScale,
+                        mouthScale * 1.3 * featureScale
+                    );
                 }
 
                 render3DScene();
@@ -740,6 +746,7 @@
 
         function loadProceduralTest3DModel(openStudio = true) {
             init3DCanvasRenderer();
+            loaded3DCharacter = null;
             reset3DFeatureOffsets();
             accessoryManager.resetRig();
             clearLoaded3DModel();
@@ -838,6 +845,12 @@
                     return;
                 }
                 initializeLoaded3DModel(assetContainer, openStudio, characterId);
+                loaded3DCharacter = character;
+                applyConfiguredLivePlaneOffsets();
+                if (loadedModelRoot) loadedModelRoot.scaling.setAll(character.modelScale);
+                c3dModelScale.value = '1';
+                if (openStudio) render3DStudioPreview();
+                else if (!camera.isActive) drawScene();
             }).catch(error => {
                 if (loadToken !== coreLoadToken || (!openStudio && selectedCharacter !== characterId)) return;
                 console.error(`3D character model "${characterId}" failed to load:`, error);
@@ -849,6 +862,7 @@
         }
 
         function initializeLoaded3DModel(assetContainer, openStudio = true, characterId = null) {
+            loaded3DCharacter = null;
             reset3DFeatureOffsets();
             accessoryManager.resetRig();
             clearLoaded3DModel();
@@ -941,6 +955,21 @@
             isPreviewing3D = openStudio;
             if (openStudio) render3DStudioPreview();
             else if (!camera.isActive) drawScene();
+        }
+
+        function getConfiguredFeatureOffset(name) {
+            const offset = loaded3DCharacter?.featureOffsets?.[name];
+            return offset ? new BABYLON.Vector3(offset[0], offset[1], offset[2]) : BABYLON.Vector3.Zero();
+        }
+
+        function getConfiguredFeatureScale(name) {
+            return loaded3DCharacter?.featureScales?.[name] ?? 1;
+        }
+
+        function applyConfiguredLivePlaneOffsets() {
+            Object.entries(livePlanes).forEach(([name, plane]) => {
+                plane.mesh.position.copyFrom(getConfiguredFeatureOffset(name));
+            });
         }
 
         function load3DModelFile(file) {
@@ -1173,6 +1202,27 @@
                         || ids.has(character.id)) {
                         throw new Error("Each 3D character needs a unique id, name, icon, and model path.");
                     }
+                    if (character.modelScale !== undefined
+                        && (!Number.isFinite(character.modelScale) || character.modelScale <= 0)) {
+                        throw new Error(`Character "${character.id}" modelScale must be a positive number.`);
+                    }
+                    const featureNames = ['eye_left', 'eye_right', 'mouth'];
+                    character.featureOffsets = character.featureOffsets || {};
+                    character.featureScales = character.featureScales || {};
+                    featureNames.forEach(name => {
+                        const offset = character.featureOffsets[name];
+                        if (offset !== undefined
+                            && (!Array.isArray(offset) || offset.length !== 3 || !offset.every(Number.isFinite))) {
+                            throw new Error(`Character "${character.id}" featureOffsets.${name} must be a three-number array.`);
+                        }
+                        character.featureOffsets[name] = offset || [0, 0, 0];
+                        const scale = character.featureScales[name];
+                        if (scale !== undefined && (!Number.isFinite(scale) || scale <= 0)) {
+                            throw new Error(`Character "${character.id}" featureScales.${name} must be a positive number.`);
+                        }
+                        character.featureScales[name] = scale ?? 1;
+                    });
+                    character.modelScale = character.modelScale ?? 1;
                     ids.add(character.id);
                 });
                 if (!ids.has(CORE_CHARACTER_ID)) {
@@ -1297,14 +1347,22 @@
             
             if (loadedModelRoot) { 
                 const s = c3dModelScale ? parseFloat(c3dModelScale.value) : 1.0; 
-                loadedModelRoot.scaling.set(s, s, s);
+                loadedModelRoot.scaling.setAll((loaded3DCharacter?.modelScale ?? 1) * s);
                 loadedModelRoot.rotation.y = orbitAngleX;
                 loadedModelRoot.rotation.x = orbitAngleY;
             }
             
             Object.entries(c3dFeatureOffsets).forEach(([name, sliders]) => {
                 const plane = livePlanes[name];
-                if (plane) plane.mesh.position.set(...sliders.map(slider => parseFloat(slider.value)));
+                if (plane) {
+                    const offset = getConfiguredFeatureOffset(name);
+                    plane.mesh.position.set(
+                        offset.x + parseFloat(sliders[0].value),
+                        offset.y + parseFloat(sliders[1].value),
+                        offset.z + parseFloat(sliders[2].value)
+                    );
+                    plane.mesh.scaling.setAll(1.3 * getConfiguredFeatureScale(name));
+                }
             });
 
             model3DCamera.position.z = parseFloat(c3dCamZ.value); 

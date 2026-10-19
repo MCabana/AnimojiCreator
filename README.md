@@ -31,7 +31,7 @@ Camera access requires `localhost` or HTTPS. Opening `index.html` directly with 
 
 ## Configure 3D characters
 
-Edit `models/characters.json` to add or change 3D character buttons. Each character needs a unique `id`, button `name`, button `icon`, and `model` path relative to the project root. The model path is loaded directly when its button is selected. Keep character IDs in `models/accessories.json` in sync for accessory compatibility.
+Edit `models/characters.json` to add or change 3D character buttons. Each character needs a unique `id`, button `name`, button `icon`, and `model` path relative to the project root. The optional `modelScale` applies a uniform scale to the selected character. `featureOffsets` gives local X/Y/Z offsets for each live eye and mouth plane from its matching rig bone; `featureScales` adjusts their overlay size per feature. Offset values use the model's local units and axes. These settings allow characters that share a rig to use different face-feature alignment. Keep character IDs in `models/accessories.json` in sync for accessory compatibility.
 
 ```json
 {
@@ -40,7 +40,18 @@ Edit `models/characters.json` to add or change 3D character buttons. Each charac
       "id": "uncle",
       "name": "Uncle",
       "icon": "👨",
-      "model": "models/core/uncle.glb"
+      "model": "models/core/uncle.glb",
+      "modelScale": 1,
+      "featureOffsets": {
+        "eye_left": [0, 0, 0],
+        "eye_right": [0, 0, 0],
+        "mouth": [0, 0, 0]
+      },
+      "featureScales": {
+        "eye_left": 1,
+        "eye_right": 1,
+        "mouth": 1
+      }
     }
   ]
 }
