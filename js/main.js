@@ -993,9 +993,9 @@
             const smoothedPitch = smoothHeadRotation(headRotationFilters.pitch, targetPitch, now);
             const smoothedRoll = smoothHeadRotation(headRotationFilters.roll, targetRoll, now, true);
 
-            const totalYaw = smoothedYaw * 1.0;
-            const totalPitch = smoothedPitch * 0.8;
-            const totalRoll = -smoothedRoll * 2.0;
+            const totalYaw = smoothedYaw * 1.3; // Look left/right is more pronounced than up/down
+            const totalPitch = smoothedPitch * 1.1; // Look up/down is more pronounced than left/right
+            const totalRoll = -smoothedRoll * 3.0; // Roll is exaggerated for more natural head tilt
 
             let swayPitch = 0;
 
