@@ -1050,9 +1050,9 @@ function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScal
     const smoothedPitch = smoothHeadRotation(headRotationFilters.pitch, targetPitch, now);
     const smoothedRoll = smoothHeadRotation(headRotationFilters.roll, targetRoll, now, true);
 
-    const totalYaw = smoothedYaw * 2;
+    const totalYaw = smoothedYaw * 2.3;
     const totalPitch = smoothedPitch * 2;
-    const totalRoll = -smoothedRoll * 3.0;
+    const totalRoll = -smoothedRoll * 2.5;
 
     let swayPitch = 0;
 
