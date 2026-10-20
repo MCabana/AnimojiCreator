@@ -42,7 +42,7 @@ export function setupCamera({
                 runningMode: "IMAGE",
                 numFaces: 1,
                 minFaceDetectionConfidence: 0.1,
-                minFacePresenceConfidence: 0.1
+                minFacePresenceConfidence: 0.01
             });
             setStatus("Ready to animate", "bg-blue-400");
             btnCamera.disabled = false;
