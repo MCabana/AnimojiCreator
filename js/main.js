@@ -456,11 +456,7 @@ function drawScene() {
         lastKnown.cy = canvas.height / 2;
     }
 
-    // Pull values from cache first
-    let cx = lastKnown.cx; let cy = lastKnown.cy;
-    let angle = lastKnown.angle; let yawX = lastKnown.yawX; let pitchY = lastKnown.pitchY;
-    let pitchAxisScale = lastKnown.pitchAxisScale; let globalScale = lastKnown.globalScale;
-    let landmarks = lastKnown.landmarks; let matrix = lastKnown.matrix;
+    const now = performance.now();
     let hasLiveTracking = false;
 
     const screenCenterX = canvas.width / 2;
@@ -471,13 +467,12 @@ function drawScene() {
     const vw = video.videoWidth || 640; const vh = video.videoHeight || 480;
     const isCustomStatic = (selectedCharacter === 'custom' && customSettings.isStatic);
 
-    // Extract 3D Matrix
+    // 1. Check for valid 3D Transformation Matrix
     if (camera.trackingResults && camera.trackingResults.facialTransformationMatrixes && camera.trackingResults.facialTransformationMatrixes.length > 0) {
         const rawMatrix = camera.trackingResults.facialTransformationMatrixes[0];
         const matrixData = rawMatrix.data || rawMatrix;
         if (matrixData && matrixData.length >= 15) {
-            matrix = rawMatrix;
-            lastKnown.matrix = matrix;
+            lastKnown.matrix = rawMatrix;
             const rawZ = matrixData[14];
             if (!isNaN(rawZ) && rawZ !== 0) {
                 if (neutralHeadZ === null) neutralHeadZ = rawZ;
@@ -486,32 +481,37 @@ function drawScene() {
         }
     }
 
-    // Extract 2D Landmarks
+    // 2. Check for valid 2D Landmarks
     if (camera.trackingResults && camera.trackingResults.faceLandmarks && camera.trackingResults.faceLandmarks.length > 0) {
         hasLiveTracking = true;
-        landmarks = camera.trackingResults.faceLandmarks[0];
+        lastKnown.lastValidTime = now; // Stamp the last successful frame time
+        const landmarks = camera.trackingResults.faceLandmarks[0];
         lastKnown.landmarks = landmarks;
 
         const nose = landmarks[1];
-        const leftCorner = landmarks[33]; const rightCorner = landmarks[263];
+        const leftCorner = landmarks[33]; 
+        const rightCorner = landmarks[263];
 
-        cx = ((1.0 - nose.x) - offsetPositionX) * canvas.width;
-        cy = (nose.y - offsetPositionY) * canvas.height;
+        let cx = ((1.0 - nose.x) - offsetPositionX) * canvas.width;
+        let cy = (nose.y - offsetPositionY) * canvas.height;
 
         const dxRoll = ((1.0 - leftCorner.x) - (1.0 - rightCorner.x)) * vw;
         const dyRoll = (leftCorner.y - rightCorner.y) * vh;
         let rawAngle = Math.atan2(dyRoll, dxRoll);
-        angle = rawAngle - offsetRoll;
+        let angle = rawAngle - offsetRoll;
 
         const faceWidthRatio = Math.sqrt(dxRoll * dxRoll + dyRoll * dyRoll) / vw;
 
         if (faceWidthRatio > 0.05) {
-            globalScale = (headRadius * 1.5) / (faceWidthRatio * vw);
-            const uX = dxRoll / (faceWidthRatio * vw); const uY = dyRoll / (faceWidthRatio * vw);
-            const vX = -uY; const vY = uX;
+            let globalScale = (headRadius * 1.5) / (faceWidthRatio * vw);
+            const uX = dxRoll / (faceWidthRatio * vw); 
+            const uY = dyRoll / (faceWidthRatio * vw);
+            const vX = -uY; 
+            const vY = uX;
             const midEyeX = ((1.0 - leftCorner.x) + (1.0 - rightCorner.x)) / 2;
             const midEyeY = (leftCorner.y + rightCorner.y) / 2;
-            const nX = (1.0 - nose.x) - midEyeX; const nY = nose.y - midEyeY;
+            const nX = (1.0 - nose.x) - midEyeX; 
+            const nY = nose.y - midEyeY;
 
             const localYaw = (nX * uX + nY * uY) / faceWidthRatio;
             const rawPitch = (nX * vX + nY * vY) / faceWidthRatio;
@@ -526,11 +526,12 @@ function drawScene() {
             }
 
             if (requestRecenter) {
-                offsetRoll = rawAngle; offsetYaw = localYaw; offsetPitch = rawPitch - 0.30;
+                offsetRoll = rawAngle; 
+                offsetYaw = localYaw; 
+                offsetPitch = rawPitch - 0.30;
                 offsetPositionX = (1.0 - nose.x) - 0.5;
                 offsetPositionY = nose.y - 0.5;
                 if (currentHeadZ !== 0) neutralHeadZ = currentHeadZ;
-                cx = canvas.width / 2; cy = canvas.height / 2;
                 if (faceAspectRatio > 0) neutralFaceAspectRatio = faceAspectRatio;
                 requestRecenter = false;
                 btnRecenter.textContent = "Centered!"; btnRecenter.classList.add('bg-emerald-100', 'text-emerald-600', 'border-emerald-200');
@@ -540,20 +541,34 @@ function drawScene() {
             let localPitch = (rawPitch - 0.30) - offsetPitch;
             let adjustedYaw = localYaw - offsetYaw;
 
-            yawX = adjustedYaw * headRadius * 1.2;
-            pitchY = localPitch * headRadius * 1.2;
-            if (neutralFaceAspectRatio && faceAspectRatio > 0) {
-                pitchAxisScale = Math.max(0.6, Math.min(1, faceAspectRatio / neutralFaceAspectRatio));
-            }
+            let yawX = adjustedYaw * headRadius * 1.2;
+            let pitchY = localPitch * headRadius * 1.2;
+            let pitchAxisScale = neutralFaceAspectRatio && faceAspectRatio > 0 
+                ? Math.max(0.6, Math.min(1, faceAspectRatio / neutralFaceAspectRatio)) 
+                : 1.0;
+
+            // Save evaluated metrics to cache
+            lastKnown.cx = cx; 
+            lastKnown.cy = cy; 
+            lastKnown.angle = angle;
+            lastKnown.yawX = yawX; 
+            lastKnown.pitchY = pitchY;
+            lastKnown.pitchAxisScale = pitchAxisScale; 
+            lastKnown.globalScale = globalScale;
         }
 
-        // Save current valid state to cache
-        lastKnown.cx = cx; lastKnown.cy = cy; lastKnown.angle = angle;
-        lastKnown.yawX = yawX; lastKnown.pitchY = pitchY;
-        lastKnown.pitchAxisScale = pitchAxisScale; lastKnown.globalScale = globalScale;
-
         drawPIPVisualizer(landmarks);
-    } else { drawPIPVisualizer(null); }
+    } else {
+        // Check if we are within a safe grace period (e.g., 400ms) since last valid frame
+        if (now - lastKnown.lastValidTime < 400) {
+            hasLiveTracking = true; // Keep tracking active using last known good cache!
+        } else {
+            drawPIPVisualizer(null);
+        }
+    }
+
+    // Pull final working variables from cache (whether fresh or gracefully held)
+    const { cx, cy, angle, yawX, pitchY, pitchAxisScale, globalScale, landmarks, matrix } = lastKnown;
 
     if ((selectedCharacter === 'custom' || THREE_D_CHARACTER_IDS.has(selectedCharacter)) && customSettings.is3D && model3DEngine) {
         const activeCx = isCustomStatic ? screenCenterX : cx;
