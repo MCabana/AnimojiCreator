@@ -984,18 +984,42 @@
             });
         }
 
-        function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScale) {
+       function update3DModelRigging(landmarks, roll, yaw, pitch, cx, cy, pitchAxisScale) {
             if (!modelBones.head) return 0;
             
-            const targetYaw = yaw / 150; const targetPitch = (pitch / 100) * pitchAxisScale; const targetRoll = roll;
+            let targetYaw = yaw / 150; 
+            let targetPitch = (pitch / 100) * pitchAxisScale; 
+            let targetRoll = roll; // 2D roll is already offset by the recenter logic in drawScene
+
+            // Use precise 3D facial transformation matrix for Yaw and Pitch
+            if (camera.trackingResults && camera.trackingResults.facialTransformationMatrixes && camera.trackingResults.facialTransformationMatrixes.length > 0) {
+                const matrix = camera.trackingResults.facialTransformationMatrixes[0];
+                const m = matrix.data || matrix;
+                if (m && m.length >= 15) {
+                    let currentMatrixYaw = -Math.atan2(m[8], m[10]); 
+                    let currentMatrixPitch = -Math.asin(Math.max(-1, Math.min(1, m[9]))); 
+                    
+                    // Capture the absolute 3D rotation if recenter was clicked
+                    if (window.requestMatrixRecenter) {
+                        window.matrixOffsetYaw = currentMatrixYaw;
+                        window.matrixOffsetPitch = currentMatrixPitch;
+                        window.requestMatrixRecenter = false;
+                    }
+                    
+                    // Apply the captured offsets to zero out the rotation
+                    targetYaw = currentMatrixYaw - (window.matrixOffsetYaw || 0); 
+                    targetPitch = currentMatrixPitch - (window.matrixOffsetPitch || 0); 
+                }
+            }
+
             const now = performance.now();
             const smoothedYaw = smoothHeadRotation(headRotationFilters.yaw, targetYaw, now);
             const smoothedPitch = smoothHeadRotation(headRotationFilters.pitch, targetPitch, now);
             const smoothedRoll = smoothHeadRotation(headRotationFilters.roll, targetRoll, now, true);
 
-            const totalYaw = smoothedYaw * 1.3; // Look left/right is more pronounced than up/down
-            const totalPitch = smoothedPitch * 1.1; // Look up/down is more pronounced than left/right
-            const totalRoll = -smoothedRoll * 3.0; // Roll is exaggerated for more natural head tilt
+            const totalYaw = smoothedYaw * 2; 
+            const totalPitch = smoothedPitch * 2; 
+            const totalRoll = -smoothedRoll * 3.0;
 
             let swayPitch = 0;
 
@@ -1007,13 +1031,16 @@
                 const frustumWidth = frustumHeight * aspect;
                 
                 const targetTransX = -screenDx * frustumWidth;
-                const targetTransY = -screenDy * frustumHeight;
+                
+                // RESTORED: Give back 90% of the vertical body movement.
+                // We use pitchCompensation to cancel out the nose movement caused solely by head tilt.
+                const pitchCompensation = targetPitch * 0.25; 
+                const targetTransY = -(screenDy + pitchCompensation) * frustumHeight * 0.90;
 
                 let targetTransZ = 0;
                 if (neutralHeadZ !== null && currentHeadZ !== 0) {
                     const deltaZ = currentHeadZ - neutralHeadZ;
-                    // deltaZ > 0 when user moves closer to the camera
-                    targetTransZ = Math.max(-1.5, Math.min(1.5, deltaZ * 0.04));
+                    targetTransZ = Math.max(-3.0, Math.min(3.0, deltaZ * 0.12));
                 }
                 
                 if (loadedModelRoot.tx === undefined) { 
@@ -1028,34 +1055,19 @@
                 loadedModelRoot.position.y = loadedModelRoot.baseY + loadedModelRoot.ty;
                 loadedModelRoot.position.z = loadedModelRoot.tz;
 
-                swayPitch = -screenDy * 1.0;
+                swayPitch = -screenDy * 0.2;
             }
 
             const wSpine0 = 0.10; const wSpine1 = 0.20; const wNeck = 0.30; const wHead = 0.40;
 
             if (modelBones.spine_0) {
-                setTrackedRotation(
-                    modelBones.spine_0,
-                    totalYaw * wSpine0,
-                    totalPitch * wSpine0 + swayPitch * 0.5,
-                    totalRoll * wSpine0
-                );
+                setTrackedRotation(modelBones.spine_0, totalYaw * wSpine0, totalPitch * wSpine0 + swayPitch * 0.5, totalRoll * wSpine0);
             }
             if (modelBones.spine_1) {
-                setTrackedRotation(
-                    modelBones.spine_1,
-                    totalYaw * wSpine1,
-                    totalPitch * wSpine1 + swayPitch * 0.5,
-                    totalRoll * wSpine1
-                );
+                setTrackedRotation(modelBones.spine_1, totalYaw * wSpine1, totalPitch * wSpine1 + swayPitch * 0.5, totalRoll * wSpine1);
             }
             if (modelBones.neck) {
-                setTrackedRotation(
-                    modelBones.neck,
-                    totalYaw * wNeck,
-                    totalPitch * wNeck - swayPitch * 0.2,
-                    totalRoll * wNeck
-                );
+                setTrackedRotation(modelBones.neck, totalYaw * wNeck, totalPitch * wNeck - swayPitch * 0.2, totalRoll * wNeck);
             }
             if (modelBones.head) {
                 setTrackedRotation(modelBones.head, totalYaw * wHead, totalPitch * wHead, totalRoll * wHead);
@@ -1066,6 +1078,7 @@
                 setTrackedRotation(modelBones.eye_left, eyeGazeYaw, 0, 0);
                 setTrackedRotation(modelBones.eye_right, eyeGazeYaw, 0, 0);
             }
+            
             return smoothedRoll;
         }
 
@@ -1269,7 +1282,10 @@
         sliderEyes.addEventListener('input', (e) => { eyeScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
         sliderNose.addEventListener('input', (e) => { noseScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
         sliderMouth.addEventListener('input', (e) => { mouthScale = parseFloat(e.target.value); if(!camera.isActive) drawScene(); });
-        btnRecenter.addEventListener('click', () => { requestRecenter = true; });
+        btnRecenter.addEventListener('click', () => { 
+            requestRecenter = true; 
+            window.requestMatrixRecenter = true; 
+        });
 
         btnTogglePip.addEventListener('click', () => {
             showPip = !showPip;
